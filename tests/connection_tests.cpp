@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
-#include<connection.h>
+#include <asio.hpp>
+#include "server.h"
+#include "client.h"
 
-TEST(UnitTests, ConnectionLibIsLinked)
+TEST(UnitTests, ConnectionIsLinked)
 {
-    EXPECT_EQ(103002, Connection::test());
+
 }

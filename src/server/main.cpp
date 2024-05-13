@@ -1,8 +1,22 @@
-#include <iostream>
-#include "connection.h"
+#include "server.h"
 
-int main(int argc, const char** argv) 
+#include <asio.hpp>
+#include <iostream>
+
+using asio::ip::udp;
+
+int main()
 {
-    std::cout << ' ' << "Server" << '\n';
-    return 0;
+  try
+  {
+    asio::io_context io_context;
+    Server server(io_context, 5555);
+    io_context.run();
+  }
+  catch (std::exception &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  return 0;
 }

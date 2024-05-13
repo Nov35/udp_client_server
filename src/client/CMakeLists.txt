@@ -1,5 +1,7 @@
 project(UDP_Client VERSION 1.0.0 LANGUAGES C CXX)
 
-add_executable(UDP_Client main.cpp)
+file(GLOB client_SRC CONFIGURE_DEPENDS "*.h" "*.cpp")
 
-target_link_libraries(UDP_Client PUBLIC Connection)
+add_executable(UDP_Client ${client_SRC})
+
+target_link_libraries(UDP_Client PUBLIC Common)

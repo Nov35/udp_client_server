@@ -1,0 +1,13 @@
+#pragma once
+
+#include <string_view>
+
+namespace project
+{
+    static constexpr std::string_view name = "@PROJECT_NAME@";
+    static constexpr std::string_view version = "@PROJECT_VERSION@";
+
+    uint8_t major_version {@PROJECT_VERSION_MAJOR@};
+    uint8_t minor_version {@PROJECT_VERSION_MINOR@};
+    uint8_t patch_version {@PROJECT_VERSION_PATCH@};
+}
