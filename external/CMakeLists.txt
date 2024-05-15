@@ -26,8 +26,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json)
 
 FetchContent_Declare(
-    cereal
-    GIT_REPOSITORY https://github.com/USCiLab/cereal
-    GIT_TAG v1.3.2
+    ser20
+    GIT_REPOSITORY https://github.com/royjacobson/ser20
+    GIT_TAG main
     GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(cereal)
+FetchContent_MakeAvailable(ser20)

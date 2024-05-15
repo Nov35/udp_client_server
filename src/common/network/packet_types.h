@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cereal/types/polymorphic.hpp>
+#include <ser20/types/polymorphic.hpp>
 
 #include <asio/streambuf.hpp>
 
@@ -137,19 +137,19 @@ struct PayloadMessage : Packet
     }
 };
 
-CEREAL_REGISTER_TYPE(InitialRequest)
-CEREAL_REGISTER_TYPE(InitialResponse)
-CEREAL_REGISTER_TYPE(RangeSettingMessage)
-CEREAL_REGISTER_TYPE(PacketCheckRequest)
-CEREAL_REGISTER_TYPE(PacketCheckResponse)
-CEREAL_REGISTER_TYPE(PayloadMessage)
+SER20_REGISTER_TYPE(InitialRequest)
+SER20_REGISTER_TYPE(InitialResponse)
+SER20_REGISTER_TYPE(RangeSettingMessage)
+SER20_REGISTER_TYPE(PacketCheckRequest)
+SER20_REGISTER_TYPE(PacketCheckResponse)
+SER20_REGISTER_TYPE(PayloadMessage)
 
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, InitialRequest)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, InitialResponse)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, RangeSettingMessage)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, PacketCheckRequest)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, PacketCheckResponse)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, PayloadMessage)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, InitialRequest)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, InitialResponse)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, RangeSettingMessage)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, PacketCheckRequest)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, PacketCheckResponse)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, PayloadMessage)
 
 
 //! To be removed
@@ -171,5 +171,5 @@ struct TestPacket : Packet
     }
 };
 
-CEREAL_REGISTER_TYPE(TestPacket)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(Packet, TestPacket)
+SER20_REGISTER_TYPE(TestPacket)
+SER20_REGISTER_POLYMORPHIC_RELATION(Packet, TestPacket)

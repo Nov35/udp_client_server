@@ -63,7 +63,6 @@ void Network::HandleReceive(const std::error_code& error,
                             size_t bytes_transferred,
                             udp::endpoint sender_endpoint)
 {
-    std::cout << "here" << std::endl;
     if (error)
     {
 
