@@ -2,6 +2,9 @@
 
 #include "network.h"
 
+#include <asio/thread_pool.hpp>
+#include <asio/ip/udp.hpp>
+
 class Server
 {
 public:
@@ -10,9 +13,9 @@ public:
 private:
     ReceiveHandlingFuncs GetCallbackList();
 
-    void TestHandle(TestPacket::Ptr packet, std::error_code error,
-                    size_t bytes_received, asio::ip::udp::endpoint sender);
+    void HandleInitialRequest(asio::ip::udp::endpoint sender, Packet::Ptr Packet);
 
 private:
     Network network_;
+    asio::thread_pool pool_;
 };

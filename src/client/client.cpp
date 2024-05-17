@@ -14,14 +14,6 @@ Client::Client(asio::io_context &io_context, std::string server_ip, uint16_t por
 
     server_endpoint_ =
         *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
-
-
-    //!TEST
-
-    TestPacket::Ptr test = std::make_shared<TestPacket>();
-    test->str_ = "Just a string.";
-    network_.Send(test, server_endpoint_);
-    network_.Receive();
 }
 
 ReceiveHandlingFuncs Client::GetCallbackList()

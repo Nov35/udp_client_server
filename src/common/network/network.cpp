@@ -8,28 +8,26 @@
 
 using asio::ip::udp;
 
-constexpr size_t expected_packet_size = 1500;
-
 Network::Network(asio::io_context &io_context,
                  ReceiveHandlingFuncs packet_handle_callbacks)
-    : socket_(io_context),
+    : socket_(io_context, udp::v4()), receive_buffer_(constants::expected_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
-    socket_.open(udp::v4());
 }
 
 Network::Network(asio::io_context &io_context, uint16_t port,
                  ReceiveHandlingFuncs packet_handle_callbacks)
     : socket_(io_context, udp::endpoint(udp::v4(), port)),
+      receive_buffer_(constants::expected_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
 }
 
 void Network::Send(Packet::Ptr packet, udp::endpoint receiver_endpoint)
 {
-    asio::streambuf buffer;
-    Serialize(packet, buffer);
-    socket_.async_send_to(buffer.data(), receiver_endpoint,
+    BinaryData buffer;
+    size_t data_size = Serialize(packet, buffer);
+    socket_.async_send_to(asio::buffer(buffer, data_size), receiver_endpoint,
                           std::bind(&Network::HandleSend,
                                     this,
                                     asio::placeholders::error,
@@ -38,51 +36,44 @@ void Network::Send(Packet::Ptr packet, udp::endpoint receiver_endpoint)
 
 void Network::Receive()
 {
-    udp::endpoint sender_endpoint;
-    asio::streambuf::mutable_buffers_type buffer_stream = recv_buffer_.prepare(expected_packet_size);
-
-    socket_.async_receive_from(buffer_stream, sender_endpoint,
+    socket_.async_receive_from(asio::buffer(receive_buffer_), last_sender_,
                                std::bind(&Network::HandleReceive,
                                          this,
                                          asio::placeholders::error,
-                                         asio::placeholders::bytes_transferred,
-                                         std::move(sender_endpoint)));
+                                         asio::placeholders::bytes_transferred));
 }
 
 Packet::Ptr Network::GetPacket(Packet::Ptr destination)
 {
-    Deserialize(recv_buffer_, destination);
+    Deserialize(receive_buffer_, destination);
     return destination;
 }
 
-void Network::HandleSend(const std::error_code& , std::size_t bytes_transferred)
+void Network::HandleSend(const std::error_code &, std::size_t bytes_transferred)
 {
 }
 
-void Network::HandleReceive(const std::error_code& error,
-                            size_t bytes_transferred,
-                            udp::endpoint sender_endpoint)
+void Network::HandleReceive(const std::error_code &error,
+                            size_t bytes_transferred)
 {
+
     if (error)
     {
 
         return;
     }
 
-
-    std::istream is(&recv_buffer_);
-
-
-    PacketType type;
-    is >> *(reinterpret_cast<uint8_t *>(&type));
+    PacketType type = static_cast<PacketType>(receive_buffer_[0]);
 
     if (!packet_handle_callbacks_.contains(type))
     {
 
         return;
     }
-    
+
     auto callback = packet_handle_callbacks_.at(type);
 
-    // callback(error, bytes_transferred, sender_endpoint);
+    callback(last_sender_);
+
+    Receive();
 }

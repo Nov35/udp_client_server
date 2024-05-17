@@ -1,10 +1,13 @@
 #include "server.h"
 
 #include <iostream>
+#include <thread>
+#include <chrono>
 
+std::mutex mut;
 
 Server::Server(asio::io_context &io_context, uint16_t port)
-    : network_(io_context, port, GetCallbackList())
+    : network_(io_context, port, GetCallbackList()), pool_(std::thread::hardware_concurrency())
 {
     network_.Receive();
 }
@@ -12,28 +15,17 @@ Server::Server(asio::io_context &io_context, uint16_t port)
 ReceiveHandlingFuncs Server::GetCallbackList()
 {
     ReceiveHandlingFuncs callbacks;
-    
-    callbacks.insert({PacketType::TEST_TYPE, 
-    [this](std::error_code error, size_t bytes_received, asio::ip::udp::endpoint sender)
-        {
-            TestPacket::Ptr test = std::make_shared<TestPacket>();
-            network_.GetPacket(test);
-            TestHandle(test, error, bytes_received, sender);
-        }
-    });
+
+    callbacks.insert({PacketType::InitialRequest,
+                      [this](asio::ip::udp::endpoint sender)
+                      {
+                          asio::post(pool_, std::bind(&Server::HandleInitialRequest, this, sender,
+                                                      network_.GetPacket(std::make_shared<InitialRequest>())));
+                      }});
 
     return callbacks;
 }
 
-//! The code is used for testing purposes and must be removed later
-void Server::TestHandle(TestPacket::Ptr packet, std::error_code error, size_t bytes_received, asio::ip::udp::endpoint sender)
+void Server::HandleInitialRequest(asio::ip::udp::endpoint sender, Packet::Ptr Packet)
 {
-    if (!error)
-    {
-        std::cout << "Received message : " << packet->str_ << " Packet size: " <<  bytes_received << '\n'
-        << "Sender address: " << sender.address() << ':' << sender.port() << '\n' <<
-        "Sending back." << '\n';
-        
-        network_.Send(packet, sender);
-    }
 }

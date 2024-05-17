@@ -26,8 +26,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json)
 
 FetchContent_Declare(
-    ser20
-    GIT_REPOSITORY https://github.com/royjacobson/ser20
-    GIT_TAG main
+    bitsery
+    GIT_REPOSITORY https://github.com/fraillt/bitsery
+    GIT_TAG v5.2.3
     GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(ser20)
+FetchContent_MakeAvailable(bitsery)
