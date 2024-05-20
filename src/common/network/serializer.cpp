@@ -7,6 +7,7 @@
 #include <bitsery/ext/std_smart_ptr.h>
 #include <bitsery/traits/vector.h>
 #include <bitsery/traits/string.h>
+
 #include <cassert>
 #include <memory>
 
@@ -30,11 +31,10 @@ void serialize(S &s, InitialRequest &o)
 }
 
 template <typename S>
-void serialize(S &s, InitialResponse &o)
+void serialize(S &s, ServerResponse &o)
 {
     s.value1b(o.is_successful_);
-    s.value1b(o.error_length_);
-    s.text1b(o.error_msg_);
+    s.text1b(o.message_, constants::max_error_length);
 }
 
 template <typename S>
@@ -60,8 +60,8 @@ template <typename S>
 void serialize(S &s, PayloadMessage &o)
 {
     s.value1b(o.packet_id_);
-    s.value1b(o.count_);
-    s.container8b(o.elements_);
+    s.value1b(o.payload_size_);
+    s.container8b(o.payload_);
 }
 
 namespace bitsery
@@ -72,7 +72,7 @@ namespace bitsery
         template <>
         struct PolymorphicBaseClass<Packet>
             : PolymorphicDerivedClasses<InitialRequest,
-                                        InitialResponse,
+                                        ServerResponse,
                                         RangeSettingMessage,
                                         PacketCheckRequest,
                                         PayloadMessage>

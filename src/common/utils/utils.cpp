@@ -1,6 +1,24 @@
-#include "os_utils.h"
+#include "utils.h"
 
 #include <stdexcept>
+#include <chrono>
+#include <iomanip>
+#include <string>
+#include <sstream>
+
+namespace utils
+{
+    std::string CurrentTimeString()
+    {
+        using namespace std::literals;
+        using std::chrono::system_clock;
+
+        const std::time_t t_c = system_clock::to_time_t(system_clock::now());
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&t_c), "%F_%T") << std::flush;
+        return ss.str();
+    }
+}
 
 const size_t max_length = 4096;
 
@@ -25,7 +43,7 @@ namespace utils
         return path_buffer;
     }
 
-} // namespace utils
+}
 
 #elif defined _WIN32
 
@@ -33,7 +51,6 @@ namespace utils
 
 namespace utils
 {
-
     std::filesystem::path CurrentExecutableFilePath()
     {
         char path_buffer[max_length];
@@ -47,7 +64,7 @@ namespace utils
         return path_buffer;
     }
 
-} // namespace utils
+}
 
 #else
 

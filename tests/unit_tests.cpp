@@ -37,10 +37,10 @@ TEST(UnitTests, PayloadPacketPolymorphicDeserealization)
     auto child_pt1 = static_pointer_cast<PayloadMessage>(base_pt1);
     
     child_pt1->packet_id_ = 4;
-    child_pt1->count_ = 124;
+    child_pt1->payload_size_ = 124;
     
-    for(int i = 1; i <= child_pt1->count_; ++i)
-        child_pt1->elements_[i - 1] = double(i) / 1000000.0;
+    for(int i = 1; i <= child_pt1->payload_size_; ++i)
+        child_pt1->payload_[i - 1] = double(i) / 1000000.0;
 
     size_t written = Serialize(base_pt1, buffer);
     size_t buff_size = buffer.size();
@@ -53,8 +53,8 @@ TEST(UnitTests, PayloadPacketPolymorphicDeserealization)
     auto child_pt2 = static_pointer_cast<PayloadMessage>(base_pt1);
 
     EXPECT_EQ(child_pt1->packet_id_, child_pt2->packet_id_);
-    EXPECT_EQ(child_pt1->count_, child_pt2->count_);
+    EXPECT_EQ(child_pt1->payload_size_, child_pt2->payload_size_);
 
-    for(int i = 0; i < child_pt1->count_; ++i)
-        EXPECT_EQ(child_pt1->elements_[i], child_pt2->elements_[i]);
+    for(int i = 0; i < child_pt1->payload_size_; ++i)
+        EXPECT_EQ(child_pt1->payload_[i], child_pt2->payload_[i]);
 }

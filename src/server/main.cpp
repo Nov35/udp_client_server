@@ -1,21 +1,45 @@
 #include "server.h"
+#include "configuration.h"
+#include "utils.h"
 
-#include <asio.hpp>
+#include <asio/io_context.hpp>
+
 #include <iostream>
-
-using asio::ip::udp;
 
 int main()
 {
+    std::filesystem::path configPath;
+    config::Server settings;
+
+    try
+    {
+        using namespace config;
+
+        configPath = utils::CurrentExecutableFilePath().replace_filename("config.json");
+        settings = LoadOrCreate<config::Server>(configPath);
+    }
+    catch (const std::exception &error)
+    {
+        std::cerr << "Failed to load settings file at: " << configPath << '\n'
+                  << "Error: " << error.what() << '\n';
+
+        return -1;
+    }
+
+    InitializeLogger(settings.logger_);
+
     try
     {
         asio::io_context io_context;
-        Server server(io_context, 5555);
+
+        spdlog::info("Initializing server on port: {}", settings.port_);
+        Server server(io_context, settings.port_);
+
         io_context.run();
     }
     catch (std::exception &e)
     {
-        std::cerr << e.what() << std::endl;
+        spdlog::critical("Server was terminated due to exception: {}", e.what());
     }
 
     return 0;

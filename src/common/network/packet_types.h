@@ -5,14 +5,12 @@
 #include <memory>
 #include <vector>
 
-// TODO Provide better research about maximum size of payload guaranteed to be sent without fragmentation
-
 using BinaryData = std::vector<uint8_t>;
 
 enum class PacketType : uint8_t
 {
     InitialRequest,
-    InitialResponse,
+    ServerResponse,
 
     RangeSettingMessage,
 
@@ -27,6 +25,7 @@ struct Packet
     using Ptr = std::shared_ptr<Packet>;
 
     virtual PacketType GetType() = 0;
+    virtual ~Packet() = default;
 };
 
 struct InitialRequest : Packet
@@ -36,66 +35,79 @@ struct InitialRequest : Packet
     uint8_t major_version_;
     uint8_t minor_version_;
     uint8_t patch_version_;
-    
+
     virtual PacketType GetType() override
     {
         return PacketType::InitialRequest;
     }
+    ~InitialRequest() = default;
 };
 
-struct InitialResponse : Packet
+struct ServerResponse : Packet
 {
-    using Ptr = std::shared_ptr<InitialResponse>;
+    using Ptr = std::shared_ptr<ServerResponse>;
 
     bool is_successful_;
-    uint8_t error_length_;
-    char error_msg_[constants::max_error_length];
+    std::string message_;
 
     virtual PacketType GetType() override
     {
-        return PacketType::InitialResponse;
+        return PacketType::ServerResponse;
     }
+    ~ServerResponse() = default;
 };
 
 struct RangeSettingMessage : Packet
 {
+    using Ptr = std::shared_ptr<RangeSettingMessage>;
+
     double range_constant_;
 
     virtual PacketType GetType() override
     {
         return PacketType::RangeSettingMessage;
     }
+    ~RangeSettingMessage() = default;
 };
 
 struct PacketCheckRequest : Packet
 {
+    using Ptr = std::shared_ptr<PacketCheckRequest>;
+
     uint8_t packets_sent_;
 
     virtual PacketType GetType() override
     {
         return PacketType::PacketCheckRequest;
     }
+    ~PacketCheckRequest() = default;
 };
 
 struct PacketCheckResponse : Packet
 {
+    using Ptr = std::shared_ptr<PacketCheckResponse>;
+
     uint8_t packets_missing_;
-    uint8_t missing_packets_[constants::max_packets];
+    uint8_t missing_packets_[constants::packets_chunk_size];
 
     virtual PacketType GetType() override
     {
         return PacketType::PacketCheckResponse;
     }
+    ~PacketCheckResponse() = default;
 };
 
 struct PayloadMessage : Packet
 {
+    using Ptr = std::shared_ptr<PayloadMessage>;
+
     uint8_t packet_id_;
-    uint8_t count_;
-    double elements_[constants::max_payload_size];
+    uint8_t payload_size_;
+    double payload_[constants::max_payload_elements];
 
     virtual PacketType GetType() override
     {
         return PacketType::PayloadMessage;
     }
+    ~PayloadMessage() = default;
 };

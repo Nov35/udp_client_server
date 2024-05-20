@@ -1,6 +1,6 @@
 #pragma once
 
-#include <packet_types.h>
+#include "packet_types.h"
 
 size_t Serialize(const Packet::Ptr packet, BinaryData &data);
 
