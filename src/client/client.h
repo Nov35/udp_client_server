@@ -4,6 +4,8 @@
 
 #include <asio/steady_timer.hpp>
 
+#include <mutex>
+
 namespace asio
 {
     class io_context;
@@ -16,25 +18,35 @@ public:
            const std::string server_ip,
            const uint16_t port, const double range_constant);
 
-private:
     void start();
-    ReceiveHandlingFuncs GetCallbackList();
     
+private:
+    ReceiveHandlingFuncs GetCallbackList();
+
     void MakeInitialRequest();
     void SendRangeSetting();
+    void FlushBuffer();
 
 private:
-    void HandleSeverResponse(const ServerResponse::Ptr packet,
+    void HandleSeverResponse(const ServerResponse::Ptr response,
                              const udp::endpoint sender);
-    void HandlePacketCheckRequest(const PacketCheckRequest::Ptr packet,
-                                  const udp::endpoint sender);
     void HandlePayloadMessage(const PayloadMessage::Ptr packet,
                               const udp::endpoint sender);
+    void HandlePacketCheckRequest(const PacketCheckRequest::Ptr request,
+                                  const udp::endpoint sender);
+    void ProcessData();
+
+private:
+    using Lock = std::scoped_lock<std::mutex>;
 
 private:
     asio::io_context &io_context_;
     Network network_;
-    const double range_constant_;
     udp::endpoint server_endpoint_;
+    const double range_constant_;
     asio::steady_timer timer_;
+
+    std::vector<PayloadMessage::Ptr> buffer_;
+    std::vector<double> collected_data_;
+    std::mutex data_mutex_;
 };

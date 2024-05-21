@@ -1,7 +1,7 @@
 #pragma once
 
 #include "network.h"
-#include "client_store.h"
+#include "storage/client_store.h"
 
 #include <asio/ip/udp.hpp>
 #include <asio/thread_pool.hpp>
@@ -14,8 +14,11 @@ public:
 private:
     ReceiveHandlingFuncs GetCallbackList();
 
-    void LogAndSendError(udp::endpoint client, std::string_view error);
-    void SendDataChunck(ClientContext *context, const udp::endpoint receiver);
+    void RegisterErrorAndRemoveUser(udp::endpoint client, std::string_view error);
+    void SendChunkOfData(ClientContext *context, const udp::endpoint receiver);
+    void ResendMissingPackets(const PacketCheckResponse::Ptr packet,
+                              const udp::endpoint client);
+    void SendPacketCheckRequest(ClientContext *context, const udp::endpoint client);
 
 private:
     void HandleInitialRequest(const InitialRequest::Ptr packet,

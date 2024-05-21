@@ -1,6 +1,8 @@
 #include "client_context.h"
 
 #include "constants.h"
+#include "data_chunk.h"
+
 #include <algorithm>
 #include <random>
 
@@ -19,11 +21,16 @@ void ClientContext::SetState(const ClientState state)
     state_ = state;
 }
 
+asio::steady_timer & ClientContext::Timer()
+{
+    return timer_;
+}
+
 void ClientContext::PrepareData(const double range)
 {
     data_.resize(constants::values_to_transfer);
 
-    std::default_random_engine engine;
+    std::random_device engine;
     std::uniform_real_distribution<double> distribution(-range, range);
 
     std::generate_n(data_.begin(), constants::values_to_transfer,
@@ -33,12 +40,12 @@ void ClientContext::PrepareData(const double range)
                     });
 }
 
-size_t ClientContext::GetIteration()
+const std::vector<double> &ClientContext::GetData()
 {
-    return iteration_;
+    return data_;
 }
 
-void ClientContext::IncreaseIteration()
+void ClientContext::NextChunkOfData()
 {
     ++iteration_;
 }
@@ -47,12 +54,17 @@ DataChunk ClientContext::GetChunkOfData()
 {
     using namespace constants;
 
-    size_t begin = iteration_ * packets_chunk_size;
+    size_t begin = iteration_ * elements_in_iteration;
 
     if(begin >= data_.size())
-        return {nullptr, nullptr};
+        return DataChunk{nullptr, nullptr, 0};
 
-    size_t end = std::min(begin + iteration_size, data_.size());
+    size_t end = std::min(begin + elements_in_iteration, data_.size());
 
-    return {data_.data() + begin, data_.data() + end};
+    size_t packets_count = (end - begin) / constants::max_payload_elements;
+
+    if((end - begin) % constants::max_payload_elements != 0)
+        ++packets_count;
+
+    return DataChunk{(data_.data() + begin), (data_.data() + end), packets_count};
 }

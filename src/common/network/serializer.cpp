@@ -75,6 +75,7 @@ namespace bitsery
                                         ServerResponse,
                                         RangeSettingMessage,
                                         PacketCheckRequest,
+                                        PacketCheckResponse,
                                         PayloadMessage>
         {
         };

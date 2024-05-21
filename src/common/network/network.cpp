@@ -15,6 +15,7 @@ Network::Network(asio::io_context &io_context,
       packet_handle_callbacks_(packet_handle_callbacks)
 {
     socket_.open(udp::v4());
+    // socket_.set_option(asio::socket_base::receive_buffer_size(1000000));
 }
 
 Network::Network(asio::io_context &io_context, const uint16_t port,
@@ -23,6 +24,7 @@ Network::Network(asio::io_context &io_context, const uint16_t port,
       receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
+    // socket_.set_option(asio::socket_base::receive_buffer_size(1000000));
 }
 
 void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint)
@@ -61,10 +63,6 @@ void Network::HandleSend(const std::error_code &error, const size_t bytes_transf
                       error.message());
         return;
     }
-
-    spdlog::trace("{}:{}: Sent {} bytes",
-                  receiver_endpoint.address().to_string(), receiver_endpoint.port(),
-                  bytes_transferred);
 }
 
 void Network::HandleReceive(const std::error_code &error,
@@ -86,10 +84,6 @@ void Network::HandleReceive(const std::error_code &error,
 
         return Receive();
     }
-
-    spdlog::trace("{}:{}: Received packet type: {} of size: {}",
-                  last_sender_.address().to_string(), last_sender_.port(),
-                  static_cast<uint>(type), bytes_received);
 
     auto callback = packet_handle_callbacks_.at(type);
 

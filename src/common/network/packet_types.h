@@ -109,5 +109,6 @@ struct PayloadMessage : Packet
     {
         return PacketType::PayloadMessage;
     }
+
     ~PayloadMessage() = default;
 };

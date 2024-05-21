@@ -38,6 +38,7 @@ int main()
 
         spdlog::info("Initializing application with server address: {}:{}", address.hostname_, address.port_);
         Client cl(io_context, address.hostname_, address.port_, settings.range_constant_);
+        cl.start();
 
         std::thread worker([&io_context]()
                            { io_context.run(); });

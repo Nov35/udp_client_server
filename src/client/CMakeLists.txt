@@ -5,4 +5,4 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../../bin/client)
 
 add_executable(UDP_Client ${client_SRC})
 
-target_link_libraries(UDP_Client PUBLIC Common)
+target_link_libraries(UDP_Client PRIVATE Common)

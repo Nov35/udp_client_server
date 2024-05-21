@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "serializer.h"
+#include "client_context.cpp"
 
+#include <asio/io_context.hpp>
 
 TEST(UnitTests, InitialRequestPolymorphicDeserealization)
 {
@@ -57,4 +59,30 @@ TEST(UnitTests, PayloadPacketPolymorphicDeserealization)
 
     for(int i = 0; i < child_pt1->payload_size_; ++i)
         EXPECT_EQ(child_pt1->payload_[i], child_pt2->payload_[i]);
+}
+
+TEST(UnitTests, GeneratedDataIsAccessedCorrectly)
+{
+    asio::io_context io;
+    ClientContext context(io);
+    context.PrepareData(100.0);
+
+    auto& data = context.GetData();
+
+    std::vector<double> dest(data.size());
+    auto dest_ptr = dest.data();
+
+    DataChunk chunk = context.GetChunkOfData();
+    while(chunk.GetPacketsCount() != 0)
+    {
+        for(int i = 1; i <= chunk.GetPacketsCount(); ++i)
+        {
+            auto[begin, end] = chunk.GetPayload(i);
+            dest_ptr = std::copy(begin, end, dest_ptr);
+        }
+        context.NextChunkOfData();
+        chunk = context.GetChunkOfData();
+    }
+    
+    ASSERT_TRUE(std::equal(data.begin(), data.end(), dest.begin()));
 }

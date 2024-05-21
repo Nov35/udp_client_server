@@ -6,18 +6,14 @@
 #include <vector>
 #include <memory>
 
+class DataChunk;
+
 enum class ClientState
 {
     Accepted,
     InProgress,
     WaitingForPacketCheck,
     Done
-};
-
-struct DataChunk
-{
-    double* begin_;
-    double* end_;
 };
 
 class ClientContext
@@ -30,11 +26,13 @@ public:
 
     ClientState GetState();
     void SetState(const ClientState state);
+
+    asio::steady_timer& Timer();
     
     void PrepareData(const double range);
+    const std::vector<double>& GetData();
 
-    size_t GetIteration();
-    void IncreaseIteration();
+    void NextChunkOfData();
 
     DataChunk GetChunkOfData();
 
