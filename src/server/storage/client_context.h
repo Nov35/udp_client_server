@@ -1,5 +1,7 @@
 #pragma once
 
+#include "send_repeater.h"
+
 #include <asio/io_context.hpp>
 #include <asio/steady_timer.hpp>
 
@@ -27,7 +29,7 @@ public:
     ClientState GetState();
     void SetState(const ClientState state);
 
-    asio::steady_timer& Timer();
+    RepeatingTimer& Repeat();
     
     void PrepareData(const double range);
     const std::vector<double>& GetData();
@@ -40,6 +42,6 @@ private:
     //! In real world example separate lock for each client might be needed
     size_t iteration_;
     ClientState state_;
-    asio::steady_timer timer_;
+    RepeatingTimer repeat_;
     std::vector<double> data_;
 };

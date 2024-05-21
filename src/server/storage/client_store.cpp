@@ -45,11 +45,7 @@ bool ClientStore::Remove(const udp::endpoint endpoint)
 
     auto entry = store_.find(endpoint);
     if (entry == store_.end())
-    {
-        spdlog::error("Attempt to remove non-existent user context for endpoint {}:{}",
-                      endpoint.address().to_string(), endpoint.port());
         return false;
-    }
 
     store_.erase(entry);
 

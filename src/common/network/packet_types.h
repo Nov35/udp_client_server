@@ -7,6 +7,8 @@
 
 using BinaryData = std::vector<uint8_t>;
 
+//TODO Try approach without dynamic allocation/polymorphysm
+
 enum class PacketType : uint8_t
 {
     InitialRequest,

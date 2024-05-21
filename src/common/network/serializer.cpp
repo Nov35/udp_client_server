@@ -118,7 +118,7 @@ size_t Serialize(const Packet::Ptr packet, BinaryData &buffer)
     std::get<1>(ctx).registerBasesList<PacketSerializer>(PacketHierarchy{});
 
     PacketSerializer ser{ctx, buffer};
-    PacketHolder holder(std::move(packet));
+    PacketHolder holder(packet);
     ser.object(holder);
     ser.adapter().flush();
 
@@ -132,7 +132,7 @@ size_t Deserialize(const BinaryData &buffer, Packet::Ptr packet)
 
     size_t bytes_read;
     PacketDeserializer des{ctx, buffer.begin(), bytes_read};
-    PacketHolder holder(std::move(packet));
+    PacketHolder holder(packet);
     des.object(holder);
     std::get<0>(ctx).clearSharedState();
 

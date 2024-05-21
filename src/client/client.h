@@ -2,7 +2,7 @@
 
 #include "network.h"
 
-#include <asio/steady_timer.hpp>
+#include "send_repeater.h"
 
 #include <mutex>
 
@@ -44,7 +44,8 @@ private:
     Network network_;
     udp::endpoint server_endpoint_;
     const double range_constant_;
-    asio::steady_timer timer_;
+    asio::steady_timer first_delay_timer_;
+    RepeatingTimer repeat_;
 
     std::vector<PayloadMessage::Ptr> buffer_;
     std::vector<double> collected_data_;

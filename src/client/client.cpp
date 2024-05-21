@@ -4,21 +4,29 @@
 #include "utils.h"
 
 #include <asio/io_context.hpp>
-// #include <asio/stream_file.hpp>
 #include <spdlog/spdlog.h>
 
 #include <functional>
+#include <fstream>
 
 Client::Client(asio::io_context &io_context, const std::string server_ip,
                const uint16_t port, const double range_constant)
     : io_context_(io_context),
       network_(io_context, GetCallbackList()),
-      range_constant_(range_constant), timer_(io_context)
+      range_constant_(range_constant), first_delay_timer_(io_context),
+      repeat_(io_context)
 {
     udp::resolver resolver(io_context);
 
     server_endpoint_ =
         *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
+
+    repeat_.SetCallback([this]()
+                        {
+            spdlog::error("Unable to connect to {}:{} after {} attempts. Exiting.",
+            server_endpoint_.address().to_string(), server_endpoint_.port(), constants::send_attempts);
+            io_context_.stop();
+            exit; });
 }
 
 void Client::start()
@@ -57,6 +65,8 @@ ReceiveHandlingFuncs Client::GetCallbackList()
                       [this](udp::endpoint sender)
                       {
                           PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
+                          if (packet.get() == nullptr)
+                              spdlog::critical("Not allocated!!!");
                           network_.GetPacket(packet);
 
                           asio::post(io_context_.get_executor(),
@@ -70,21 +80,14 @@ ReceiveHandlingFuncs Client::GetCallbackList()
 void Client::MakeInitialRequest()
 {
     InitialRequest::Ptr request = std::make_shared<InitialRequest>();
+
     request->major_version_ = project::major_version;
     request->minor_version_ = project::minor_version;
     request->patch_version_ = project::patch_version;
 
     spdlog::info("Sending version info to server. Version: {}", project::version_string);
 
-    network_.SendRepeatedly(request, server_endpoint_, timer_, 
-    [this]()
-    {
-        spdlog::error("Unable to connect to server after {} attempts. Exiting.",
-            constants::send_attempts);
-        io_context_.stop();
-        exit;
-    }
-    );
+    repeat_(std::bind(&Network::Send, &network_, request, server_endpoint_));
 }
 
 void Client::SendRangeSetting()
@@ -93,22 +96,24 @@ void Client::SendRangeSetting()
 
     RangeSettingMessage::Ptr setting = std::make_shared<RangeSettingMessage>();
     setting->range_constant_ = range_constant_;
+
     network_.Send(setting, server_endpoint_);
 }
 
 void Client::FlushBuffer()
 {
-    for (const auto packet : buffer_)
-        for (int i = 0; i < packet->payload_size_; ++i)
-            collected_data_.push_back(packet->payload_[i]);
-
+    for (int i = 0; i < buffer_.size(); ++i)
+    {
+        for (int j = 0; j < buffer_[i]->payload_size_; ++j)
+            collected_data_.push_back(buffer_[i]->payload_[j]);
+    }
     spdlog::trace("Flushing {} packets from buffer.", buffer_.size());
     buffer_.clear();
 }
 
 void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::endpoint sender)
 {
-    timer_.cancel();
+    repeat_.stop();
 
     // TODO Separate initialization and error handling logic
     if (!response->is_successful_)
@@ -120,13 +125,18 @@ void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::
 
     spdlog::info("Request was accepted by server.");
 
-    timer_.expires_from_now(asio::chrono::seconds(3));
-    timer_.async_wait(std::bind(&Client::SendRangeSetting, this));
+    first_delay_timer_.expires_from_now(asio::chrono::seconds(3));
+    first_delay_timer_.async_wait(std::bind(&Client::SendRangeSetting, this));
 }
 
 void Client::HandlePayloadMessage(const PayloadMessage::Ptr packet, const udp::endpoint sender)
 {
     Lock lock(data_mutex_);
+
+    if (packet.get() == nullptr)
+    {
+        spdlog::critical("Pointer is null!");
+    }
 
     if (packet->packet_id_ == 0)
     {
@@ -134,48 +144,47 @@ void Client::HandlePayloadMessage(const PayloadMessage::Ptr packet, const udp::e
         return;
     }
 
-    spdlog::trace("Received payload packet: {}", packet->packet_id_);
+    spdlog::trace("Received payload packet: {} Size: {}", packet->packet_id_, packet->payload_size_);
     buffer_.push_back(packet);
 }
 
 void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, const udp::endpoint sender)
 {
-    Lock lock(data_mutex_);
-
-    if (request->packets_sent_ == 0)
-        return ProcessData();
-
-    std::sort(buffer_.begin(), buffer_.end(), [](const auto& lhs, const auto& rhs)
-    {
-        return lhs->packet_id_ < rhs->packet_id_;
-    });
-
-    std::unique(buffer_.begin(), buffer_.end(), [](const auto& lhs, const auto& rhs)
-    {
-        return lhs->packet_id_ == rhs->packet_id_;
-    });
 
     PacketCheckResponse::Ptr response = std::make_shared<PacketCheckResponse>();
-    response->packets_missing_ = 0;
 
-    if (buffer_.size() == request->packets_sent_)
     {
-        spdlog::info("All {} packets from server were received successfully", request->packets_sent_);
-        FlushBuffer();
-        network_.Send(response, sender);
-        return;
-    }
+        Lock lock(data_mutex_);
 
-    size_t pos = 0;
-    for (size_t i = 1; i <= request->packets_sent_; ++i)
-    {
-        if (buffer_[pos]->packet_id_ != i)
+        if (request->packets_sent_ == 0)
+            return ProcessData();
+
+        spdlog::info("Incoming packet check request. packets sent: {}", request->packets_sent_);
+
+        std::sort(buffer_.begin(), buffer_.end(), [](const auto &lhs, const auto &rhs)
+                  { return lhs->packet_id_ < rhs->packet_id_; });
+
+        std::unique(buffer_.begin(), buffer_.end(), [](const auto &lhs, const auto &rhs)
+                    { return lhs->packet_id_ == rhs->packet_id_; });
+
+        response->packets_missing_ = 0;
+
+        size_t pos = 0;
+        for (size_t i = 1; i <= request->packets_sent_; ++i)
         {
-            response->missing_packets_[response->packets_missing_] = i;
-            ++response->packets_missing_;
+            if (pos >= buffer_.size() || buffer_[pos]->packet_id_ != i)
+            {
+                response->missing_packets_[response->packets_missing_] = i;
+                ++response->packets_missing_;
+
+                spdlog::trace("Adding to request missing packet: {}", i);
+            }
+            else
+                ++pos;
         }
-        else
-            ++pos;
+
+        if (response->packets_missing_ == 0)
+            FlushBuffer();
     }
 
     spdlog::warn("Requesting {} missing packets from server.", response->packets_missing_);
@@ -184,23 +193,16 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
 void Client::ProcessData()
 {
-    Lock lock(data_mutex_);
     FlushBuffer();
     std::sort(collected_data_.begin(), collected_data_.end(), std::greater());
 
     spdlog::info("Writing received data to file");
 
-    // asio::stream_file file(
-    //     io_context_, "/path/to/file",
-    //     asio::stream_file::write_only | asio::stream_file::create);
+    auto path = utils::CurrentExecutableFilePath().replace_filename("data.bin");
+    std::ofstream binary_file(path);
+    std::ostream_iterator<double> out(binary_file);
 
-    // file.async_write_some(collected_data_,
-    //                       [this](std::error_code error, size_t bytes_written)
-    //                       {
-    //                           if (error)
-    //                               throw std::runtime_error(error.message());
-    //                           else
-    //                               spdlog::info("{} bytes was written to result file");
-    //                           io_context_.stop();
-    //                       });
+    std::copy(collected_data_.begin(), collected_data_.end(), out);
+
+    binary_file.close();
 }

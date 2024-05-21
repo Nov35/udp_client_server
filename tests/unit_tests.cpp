@@ -2,6 +2,7 @@
 
 #include "serializer.h"
 #include "client_context.cpp"
+#include "send_repeater.h"
 
 #include <asio/io_context.hpp>
 

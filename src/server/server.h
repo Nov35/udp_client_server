@@ -14,7 +14,7 @@ public:
 private:
     ReceiveHandlingFuncs GetCallbackList();
 
-    void RegisterErrorAndRemoveUser(udp::endpoint client, std::string_view error);
+    void SendErrorAndRemoveClient(udp::endpoint client, std::string_view error);
     void SendChunkOfData(ClientContext *context, const udp::endpoint receiver);
     void ResendMissingPackets(const PacketCheckResponse::Ptr packet,
                               const udp::endpoint client);
@@ -22,11 +22,11 @@ private:
 
 private:
     void HandleInitialRequest(const InitialRequest::Ptr packet,
-                              const udp::endpoint sender);
+                              const udp::endpoint client);
     void HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet,
-                                   const udp::endpoint sender);
+                                   const udp::endpoint client);
     void HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet,
-                                   const udp::endpoint sender);
+                                   const udp::endpoint client);
 
 private:
     Network network_;
