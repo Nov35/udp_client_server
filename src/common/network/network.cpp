@@ -10,7 +10,7 @@
 using asio::ip::udp;
 
 Network::Network(asio::io_context &io_context,
-                 ReceiveHandlingFuncs&& packet_handle_callbacks)
+                 ReceiveHandlingFuncs &&packet_handle_callbacks)
     : socket_(io_context), receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
@@ -19,7 +19,7 @@ Network::Network(asio::io_context &io_context,
 }
 
 Network::Network(asio::io_context &io_context, const uint16_t port,
-                 ReceiveHandlingFuncs&& packet_handle_callbacks)
+                 ReceiveHandlingFuncs &&packet_handle_callbacks)
     : socket_(io_context, udp::endpoint(udp::v4(), port)),
       receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
@@ -37,6 +37,22 @@ void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoi
                                     asio::placeholders::error,
                                     asio::placeholders::bytes_transferred,
                                     receiver_endpoint));
+}
+
+void Network::SendRepeatedly(const Packet::Ptr packet, const udp::endpoint receiver_endpoint,
+                             asio::steady_timer &timer, FailCallbackFunc fail_callback, size_t count)
+{
+    Send(packet, receiver_endpoint);
+
+    if (count < constants::send_attempts)
+    {
+        timer.expires_from_now(asio::chrono::milliseconds(500));
+        timer.async_wait(std::bind(
+            &Network::SendRepeatedly, this, packet, receiver_endpoint,
+            std::ref(timer), fail_callback, ++count));
+    }
+    else
+        fail_callback();
 }
 
 void Network::Receive()

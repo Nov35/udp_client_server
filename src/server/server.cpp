@@ -93,7 +93,7 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
         throw std::logic_error("User storage was removed during data transfer");
 
     spdlog::warn("{}:{}: Preparing {} missing packets",
-                  client.address().to_string(), client.port(), packet->packets_missing_);
+                 client.address().to_string(), client.port(), packet->packets_missing_);
 
     auto chunk = context->GetChunkOfData();
 
@@ -104,13 +104,14 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
 
         if (begin == nullptr)
             return RegisterErrorAndRemoveUser(client, fmt::format("Attempt to get non-existing packet: {}.",
-                                              requested_packet));
+                                                                  requested_packet));
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = requested_packet;
         packet->payload_size_ = std::distance(begin, end);
         std::copy(begin, end, packet->payload_);
 
+        context->SetState(ClientState::WaitingForPacketCheck);
         network_.Send(packet, client);
     }
 
@@ -119,7 +120,6 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
 
 void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint client)
 {
-    context->SetState(ClientState::WaitingForPacketCheck);
     auto chunk = context->GetChunkOfData();
 
     PacketCheckRequest::Ptr check_request = std::make_shared<PacketCheckRequest>();
@@ -129,20 +129,30 @@ void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint 
         clients_.Remove(client);
 
     spdlog::info("{}:{} Sending request to check {} packets",
-                  client.address().to_string(), client.port(), check_request->packets_sent_);
+                 client.address().to_string(), client.port(), check_request->packets_sent_);
 
-    network_.Send(check_request, client);
+    context->SetState(ClientState::WaitingForPacketCheck);
+
+    network_.SendRepeatedly(check_request, client, context->Timer(),
+                            [this, client = client]()
+                            {
+                                RegisterErrorAndRemoveUser(client, fmt::format("Unable send request after {} attempts",
+                                                           constants::send_attempts));
+                            });
 }
 
 void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::endpoint sender)
 {
     if (packet->major_version_ != project::major_version ||
         packet->minor_version_ != project::minor_version)
-        return RegisterErrorAndRemoveUser(sender,
-                                          fmt::format("Unsupported version.\n\
+    {
+        RegisterErrorAndRemoveUser(sender,
+                                   fmt::format("Unsupported version.\n\
                                 The server version is: {}, and client's version is: {}.{}.{}",
-                                                      project::version_string, packet->major_version_,
-                                                      packet->minor_version_, packet->patch_version_));
+                                               project::version_string, packet->major_version_,
+                                               packet->minor_version_, packet->patch_version_));
+        return;
+    }
 
     ClientContext *context = clients_.Add(sender);
 
@@ -150,7 +160,7 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::e
         return RegisterErrorAndRemoveUser(sender, "The client's endpoint is already accepted.");
 
     spdlog::info("{}:{} Accepted",
-                  sender.address().to_string(), sender.port());
+                 sender.address().to_string(), sender.port());
 
     ServerResponse::Ptr response = std::make_shared<ServerResponse>();
     response->is_successful_ = true;
@@ -171,7 +181,7 @@ void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet, co
     }
 
     spdlog::info("{}:{} Received range constant: {}",
-            sender.address().to_string(), sender.port(), packet->range_constant_);
+                 sender.address().to_string(), sender.port(), packet->range_constant_);
 
     context->SetState(ClientState::InProgress);
     context->PrepareData(packet->range_constant_);
@@ -183,12 +193,25 @@ void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, co
 {
     ClientContext *context = clients_.Get(sender);
 
-    if (context == nullptr || context->GetState() != ClientState::WaitingForPacketCheck)
-        return RegisterErrorAndRemoveUser(sender, "Packet check was not requested.");
+    if (context == nullptr)
+    {
+        RegisterErrorAndRemoveUser(sender, "Packet check was not requested.");
+        return;
+    }
+
+    if (context->GetState() != ClientState::WaitingForPacketCheck)
+    {
+        spdlog::warn("Ignorring out of order or duplicate packet");
+        return;
+    }
+
+    context->Timer().cancel();
+    context->SetState(ClientState::InProgress);
 
     if (packet->packets_missing_ == 0)
     {
-        context->SetState(ClientState::InProgress);
+        spdlog::info("Sending next chunk of data");
+
         context->NextChunkOfData();
         return SendChunkOfData(context, sender);
     }

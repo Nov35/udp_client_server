@@ -40,10 +40,10 @@ int main()
         Client cl(io_context, address.hostname_, address.port_, settings.range_constant_);
         cl.start();
 
-        std::thread worker([&io_context]()
-                           { io_context.run(); });
+        // std::thread worker([&io_context]()
+        //                    { io_context.run(); });
         io_context.run();
-        worker.join();
+        // worker.join();
     }
     catch (std::exception &e)
     {

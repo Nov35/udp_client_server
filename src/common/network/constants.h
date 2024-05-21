@@ -12,7 +12,9 @@ namespace constants
 
     constexpr size_t max_error_length = UINT8_MAX;
     constexpr size_t packets_chunk_size = UINT8_MAX;
-    constexpr size_t elements_in_iteration = packets_chunk_size * max_payload_elements;
+    constexpr size_t elements_in_one_chunk = packets_chunk_size * max_payload_elements;
 
     constexpr size_t values_to_transfer = 1'000'000;
+
+    constexpr size_t send_attempts = 5;
 }

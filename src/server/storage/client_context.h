@@ -38,7 +38,6 @@ public:
 
 private:
     //! In real world example separate lock for each client might be needed
-    // TODO Add resending of command packets by timer
     size_t iteration_;
     ClientState state_;
     asio::steady_timer timer_;

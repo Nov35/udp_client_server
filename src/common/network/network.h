@@ -3,14 +3,17 @@
 #include "packet_types.h"
 
 #include <asio/ip/udp.hpp>
+#include <asio/steady_timer.hpp>
 
 #include <functional>
 #include <unordered_map>
+#include <mutex>
 
 using asio::ip::udp;
 
 using ReceiveHandleFunc = std::function<void(udp::endpoint)>;
 using ReceiveHandlingFuncs = std::unordered_map<PacketType, ReceiveHandleFunc>;
+using FailCallbackFunc = std::function<void()>;
 
 class Network
 {
@@ -19,6 +22,8 @@ public:
     Network(asio::io_context &io_context, const uint16_t port, ReceiveHandlingFuncs &&packet_handle_callbacks);
 
     void Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint);
+    void SendRepeatedly(const Packet::Ptr packet, const udp::endpoint receiver_endpoint,
+                        asio::steady_timer &timer, FailCallbackFunc fail_callback, size_t count = 0);
     void Receive();
     void GetPacket(Packet::Ptr destination);
 

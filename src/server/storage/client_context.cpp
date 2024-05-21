@@ -54,12 +54,12 @@ DataChunk ClientContext::GetChunkOfData()
 {
     using namespace constants;
 
-    size_t begin = iteration_ * elements_in_iteration;
+    size_t begin = iteration_ * elements_in_one_chunk;
 
     if(begin >= data_.size())
         return DataChunk{nullptr, nullptr, 0};
 
-    size_t end = std::min(begin + elements_in_iteration, data_.size());
+    size_t end = std::min(begin + elements_in_one_chunk, data_.size());
 
     size_t packets_count = (end - begin) / constants::max_payload_elements;
 

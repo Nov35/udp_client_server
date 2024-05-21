@@ -76,13 +76,21 @@ void Client::MakeInitialRequest()
 
     spdlog::info("Sending version info to server. Version: {}", project::version_string);
 
-    network_.Send(request, server_endpoint_);
+    network_.SendRepeatedly(request, server_endpoint_, timer_, 
+    [this]()
+    {
+        spdlog::error("Unable to connect to server after {} attempts. Exiting.",
+            constants::send_attempts);
+        io_context_.stop();
+        exit;
+    }
+    );
 }
 
 void Client::SendRangeSetting()
 {
     spdlog::info("Sending constant: {}.", range_constant_);
-    
+
     RangeSettingMessage::Ptr setting = std::make_shared<RangeSettingMessage>();
     setting->range_constant_ = range_constant_;
     network_.Send(setting, server_endpoint_);
@@ -100,6 +108,8 @@ void Client::FlushBuffer()
 
 void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::endpoint sender)
 {
+    timer_.cancel();
+
     // TODO Separate initialization and error handling logic
     if (!response->is_successful_)
     {
@@ -120,7 +130,7 @@ void Client::HandlePayloadMessage(const PayloadMessage::Ptr packet, const udp::e
 
     if (packet->packet_id_ == 0)
     {
-        spdlog::warn("Ignorring packet with null id.");
+        spdlog::error("Ignorring packet with null id.");
         return;
     }
 
@@ -135,8 +145,15 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
     if (request->packets_sent_ == 0)
         return ProcessData();
 
-    std::sort(buffer_.begin(), buffer_.end());
-    std::unique(buffer_.begin(), buffer_.end());
+    std::sort(buffer_.begin(), buffer_.end(), [](const auto& lhs, const auto& rhs)
+    {
+        return lhs->packet_id_ < rhs->packet_id_;
+    });
+
+    std::unique(buffer_.begin(), buffer_.end(), [](const auto& lhs, const auto& rhs)
+    {
+        return lhs->packet_id_ == rhs->packet_id_;
+    });
 
     PacketCheckResponse::Ptr response = std::make_shared<PacketCheckResponse>();
     response->packets_missing_ = 0;
@@ -161,7 +178,7 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
             ++pos;
     }
 
-    spdlog::info("Requesting {} missing packets from server.", response->packets_missing_);
+    spdlog::warn("Requesting {} missing packets from server.", response->packets_missing_);
     network_.Send(response, sender);
 }
 
@@ -170,6 +187,8 @@ void Client::ProcessData()
     Lock lock(data_mutex_);
     FlushBuffer();
     std::sort(collected_data_.begin(), collected_data_.end(), std::greater());
+
+    spdlog::info("Writing received data to file");
 
     // asio::stream_file file(
     //     io_context_, "/path/to/file",
