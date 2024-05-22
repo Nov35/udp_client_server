@@ -2,8 +2,6 @@
 
 #include "network.h"
 
-#include "repeating_timer.h"
-
 #include <mutex>
 
 namespace asio
@@ -46,7 +44,6 @@ private:
 
     const double range_constant_;
     asio::steady_timer first_delay_timer_;
-    RepeatingTimer repeat_;
 
     size_t chunks_collected_;
     std::vector<PayloadMessage::Ptr> buffer_;

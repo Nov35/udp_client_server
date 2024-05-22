@@ -134,7 +134,11 @@ void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint 
     check_request->packets_sent_ = chunk.GetPacketsCount();
 
     if (check_request->packets_sent_ == 0)
+    {
+        spdlog::info("{}:{} All packets were successfully received by client.\n",
+                 client.address().to_string(), client.port());
         clients_.Remove(client);
+    }
 
     spdlog::info("{}:{} Sending request to check {} packets from chunk {}.",
                  client.address().to_string(), client.port(), check_request->packets_sent_,
@@ -142,8 +146,7 @@ void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint 
 
     context->SetState(ClientState::WaitingForPacketCheck);
 
-    //! Figure out how and why client always receives the same first request
-    context->Repeat()(std::bind(&Network::Send, &network_, check_request, client));
+    network_.Send(check_request, client);
 }
 
 void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::endpoint client)
@@ -175,9 +178,6 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::e
                      client.address().to_string(), client.port());
         return;
     }
-
-    context->Repeat().SetCallback([this, client]()
-                                  { SendErrorAndRemoveClient(client, "Lost connetion. Removing client from storage."); });
 
     spdlog::info("{}:{} Accepted",
                  client.address().to_string(), client.port());
@@ -224,8 +224,6 @@ void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, co
         SendErrorAndRemoveClient(client, "Packet check was not requested.");
         return;
     }
-
-    context->Repeat().stop();
 
     if (context->GetState() != ClientState::WaitingForPacketCheck)
     {

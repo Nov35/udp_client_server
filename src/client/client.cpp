@@ -13,20 +13,12 @@ Client::Client(asio::io_context &io_context, const std::string server_ip,
                const uint16_t port, const double range_constant)
     : io_context_(io_context),
       network_(io_context, GetCallbackList(), server_ip, port),
-      range_constant_(range_constant), first_delay_timer_(io_context),
-      repeat_(io_context), chunks_collected_(0)
+      range_constant_(range_constant), first_delay_timer_(io_context), chunks_collected_(0)
 {
     udp::resolver resolver(io_context);
 
     server_endpoint_ =
         *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
-
-    repeat_.SetCallback([this]()
-                        {
-            spdlog::error("Unable to connect to {}:{} after {} attempts. Exiting.",
-            server_endpoint_.address().to_string(), server_endpoint_.port(), constants::send_attempts);
-            io_context_.stop();
-            exit; });
 }
 
 void Client::start()
@@ -84,8 +76,7 @@ void Client::MakeInitialRequest()
     request->patch_version_ = project::patch_version;
 
     spdlog::info("Sending version info to server. Version: {}", project::version_string);
-
-    repeat_(std::bind(&Network::Send, &network_, request, server_endpoint_));
+    network_.Send(request, server_endpoint_);
 }
 
 void Client::SendRangeSetting()
@@ -111,8 +102,6 @@ void Client::FlushBuffer()
 
 void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::endpoint sender)
 {
-    repeat_.stop();
-
     // TODO Separate initialization and error handling logic
     if (!response->is_successful_)
     {
@@ -148,18 +137,16 @@ void Client::HandlePayloadMessage(const PayloadMessage::Ptr packet, const udp::e
 
 void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, const udp::endpoint sender)
 {
-
     PacketCheckResponse::Ptr response = std::make_shared<PacketCheckResponse>();
 
     {
         Lock lock(data_mutex_);
 
-        //! Untill repeated first request problem is not solved
-        // if (request->chunk_ <= chunks_collected_)
-        // {
-        //     spdlog::warn("Ignorring duplicate check request");
-        //     return;
-        // }
+        if (request->chunk_ <= chunks_collected_)
+        {
+            spdlog::warn("Ignorring duplicate check request");
+            return;
+        }
 
         if (request->packets_sent_ == 0)
             return ProcessData();
@@ -208,13 +195,15 @@ void Client::ProcessData()
     FlushBuffer();
     std::sort(collected_data_.begin(), collected_data_.end(), std::greater());
 
-    spdlog::info("Writing received data to file");
-
     auto path = utils::CurrentExecutableFilePath().replace_filename("data.bin");
-    std::ofstream binary_file(path);
-    std::ostream_iterator<double> out(binary_file);
+    std::ofstream binary_file(path, std::ofstream::binary);
 
-    std::copy(collected_data_.begin(), collected_data_.end(), out);
+    const size_t data_size =  collected_data_.size() * sizeof(collected_data_.front());
+    spdlog::info("Writing received {} bytes to file", data_size);
+    binary_file.write(reinterpret_cast<char*>(collected_data_.data()), data_size);
 
     binary_file.close();
+    io_context_.stop();
+
+    return;
 }

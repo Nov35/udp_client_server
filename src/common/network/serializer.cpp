@@ -15,7 +15,7 @@ using bitsery::ext::BaseClass;
 using bitsery::ext::PointerObserver;
 using bitsery::ext::StdSmartPtr;
 
-//TODO Add endianness handling to support differebnt architectures
+// TODO Add endianness handling to support differebnt architectures
 
 template <typename S>
 void serialize(S &s, Packet &o)
@@ -126,7 +126,7 @@ size_t Serialize(const Packet::Ptr packet, BinaryData &buffer)
     return ser.adapter().writtenBytesCount();
 }
 
-size_t Deserialize(const BinaryData &buffer, Packet::Ptr packet)
+size_t Deserialize(BinaryData &buffer, Packet::Ptr packet)
 {
     TContext ctx{};
     std::get<1>(ctx).registerBasesList<PacketDeserializer>(PacketHierarchy{});

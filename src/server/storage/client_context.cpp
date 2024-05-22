@@ -7,7 +7,7 @@
 #include <random>
 
 ClientContext::ClientContext(asio::io_context &io_context)
-    : iteration_(0), state_(ClientState::Accepted), repeat_(io_context)
+    : iteration_(0), state_(ClientState::Accepted)
 {
 }
 
@@ -19,11 +19,6 @@ ClientState ClientContext::GetState()
 void ClientContext::SetState(const ClientState state)
 {
     state_ = state;
-}
-
-RepeatingTimer & ClientContext::Repeat()
-{
-    return repeat_;
 }
 
 void ClientContext::PrepareData(const double range)

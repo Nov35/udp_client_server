@@ -20,8 +20,6 @@ Network::Network(asio::io_context& io_context, ReceiveHandlingFuncs&& packet_han
         *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
 
     asio::connect(socket_, resolver.resolve(udp::v4(), server_ip, std::to_string(port)));
-    
-    //socket_.async_connect(server_endpoint_,[](const std::error_code& error){});
 }
 
 Network::Network(asio::io_context &io_context, const uint16_t port,
@@ -34,7 +32,7 @@ Network::Network(asio::io_context &io_context, const uint16_t port,
 
 void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint)
 {
-    BinaryData buffer;
+    BinaryData buffer(constants::max_packet_size);
     size_t data_size = Serialize(packet, buffer);
 
     socket_.async_send_to(asio::buffer(buffer.data(), data_size), receiver_endpoint,
