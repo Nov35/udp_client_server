@@ -9,12 +9,19 @@
 
 using asio::ip::udp;
 
-Network::Network(asio::io_context &io_context,
-                 ReceiveHandlingFuncs &&packet_handle_callbacks)
+Network::Network(asio::io_context& io_context, ReceiveHandlingFuncs&& packet_handle_callbacks, const std::string server_ip, const uint16_t port)
     : socket_(io_context), receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
-    socket_.open(udp::v4());
+
+    udp::resolver resolver(io_context);
+
+    auto&& server_endpoint_ =
+        *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
+
+    asio::connect(socket_, resolver.resolve(udp::v4(), server_ip, std::to_string(port)));
+    
+    //socket_.async_connect(server_endpoint_,[](const std::error_code& error){});
 }
 
 Network::Network(asio::io_context &io_context, const uint16_t port,
@@ -30,7 +37,7 @@ void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoi
     BinaryData buffer;
     size_t data_size = Serialize(packet, buffer);
 
-    socket_.async_send_to(asio::buffer(buffer, data_size), receiver_endpoint,
+    socket_.async_send_to(asio::buffer(buffer.data(), data_size), receiver_endpoint,
                           std::bind(&Network::HandleSend,
                                     this,
                                     asio::placeholders::error,
@@ -69,8 +76,11 @@ void Network::HandleReceive(const std::error_code &error,
 {
     if (error)
     {
-        spdlog::error("Error during receiving: {}", error.message());
-        return;
+        spdlog::error("{}:{}: Error during receiving: {}",
+            last_sender_.address().to_string(), last_sender_.port(),
+            error.message());
+
+        return Receive();
     }
 
     PacketType type = static_cast<PacketType>(receive_buffer_[0]);
@@ -79,12 +89,12 @@ void Network::HandleReceive(const std::error_code &error,
     {
         spdlog::warn("{}:{}: Ignoring packet with unsupported type {}",
                      last_sender_.address().to_string(), last_sender_.port(),
-                     static_cast<uint>(type));
+                     static_cast<uint32_t>(type));
 
         return Receive();
     }
 
-    auto callback = packet_handle_callbacks_.at(type);
+    const auto& callback = packet_handle_callbacks_.at(type);
 
     callback(last_sender_);
 

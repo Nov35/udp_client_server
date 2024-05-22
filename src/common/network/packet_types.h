@@ -4,8 +4,10 @@
 
 #include <memory>
 #include <vector>
+#include <string>
 
 using BinaryData = std::vector<uint8_t>;
+using Payload = double[constants::max_payload_elements];
 
 //TODO Try approach without dynamic allocation/polymorphysm
 
@@ -106,7 +108,7 @@ struct PayloadMessage : Packet
 
     uint8_t packet_id_;
     uint8_t payload_size_;
-    double payload_[constants::max_payload_elements];
+    Payload payload_;
 
     virtual PacketType GetType() override
     {

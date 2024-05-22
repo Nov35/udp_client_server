@@ -42,8 +42,8 @@ int main()
 
         std::thread worker([&io_context]()
                            { io_context.run(); });
-        io_context.run();
         worker.join();
+        io_context.run();
     }
     catch (std::exception &e)
     {

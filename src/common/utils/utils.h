@@ -5,7 +5,7 @@
 
 namespace utils {
 
-std::string CurrentTimeString();
+std::string CurrentDateString();
 std::filesystem::path CurrentExecutableFilePath();
 
 }

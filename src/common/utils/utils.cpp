@@ -5,17 +5,18 @@
 #include <iomanip>
 #include <string>
 #include <sstream>
-
+#include <iostream>
 namespace utils
 {
-    std::string CurrentTimeString()
+    std::string CurrentDateString()
     {
         using namespace std::literals;
         using std::chrono::system_clock;
 
         const std::time_t t_c = system_clock::to_time_t(system_clock::now());
         std::stringstream ss;
-        ss << std::put_time(std::localtime(&t_c), "%F_%T") << std::flush;
+        ss << std::put_time(std::localtime(&t_c), "%F") << std::flush;
+
         return ss.str();
     }
 }

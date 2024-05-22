@@ -108,7 +108,7 @@ namespace config
             if (settings.output_flags_ & Logger::File)
             {
                 auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-                    fmt::format("{}{}.log", "logs/", utils::CurrentTimeString()),
+                    fmt::format("{}{}.log", "logs/", utils::CurrentDateString()),
                     std::numeric_limits<size_t>::max(), 10, true);
 
                 fileSink->set_level(settings.logging_level_);

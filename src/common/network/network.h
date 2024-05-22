@@ -6,8 +6,8 @@
 #include <asio/steady_timer.hpp>
 
 #include <functional>
-#include <unordered_map>
 #include <mutex>
+#include <unordered_map>
 
 using asio::ip::udp;
 
@@ -17,7 +17,8 @@ using ReceiveHandlingFuncs = std::unordered_map<PacketType, ReceiveHandleFunc>;
 class Network
 {
 public:
-    Network(asio::io_context &io_context, ReceiveHandlingFuncs &&packet_handle_callbacks);
+    Network(asio::io_context &io_context, ReceiveHandlingFuncs &&packet_handle_callbacks, const std::string server_ip,
+        const uint16_t port);
     Network(asio::io_context &io_context, const uint16_t port, ReceiveHandlingFuncs &&packet_handle_callbacks);
 
     void Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint);

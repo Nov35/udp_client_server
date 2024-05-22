@@ -107,8 +107,8 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
         auto [begin, end] = chunk.GetPayload(requested_packet);
 
         if (begin == nullptr)
-            return SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
-                                                                requested_packet));
+            return /*SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
+                                                                requested_packet))*/;
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = requested_packet;
@@ -217,7 +217,6 @@ void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet, co
 
 void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, const udp::endpoint client)
 {
-
     ClientContext *context = clients_.Get(client);
 
     if (context == nullptr)

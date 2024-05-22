@@ -33,7 +33,7 @@ template <typename Func, typename... Args>
 inline void RepeatingTimer::operator()(Func &&function, Args &&...args)
 {
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lock(mutex_);
 
         if (count_ == 0)
         {
@@ -51,9 +51,8 @@ inline void RepeatingTimer::operator()(Func &&function, Args &&...args)
             count_ = 0;
             is_set_ = false;
 
-            fail_callback_();
-
-            return;
+            lock.unlock();
+            return fail_callback_();
         }
 
         ++count_;

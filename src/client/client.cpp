@@ -12,7 +12,7 @@
 Client::Client(asio::io_context &io_context, const std::string server_ip,
                const uint16_t port, const double range_constant)
     : io_context_(io_context),
-      network_(io_context, GetCallbackList()),
+      network_(io_context, GetCallbackList(), server_ip, port),
       range_constant_(range_constant), first_delay_timer_(io_context),
       repeat_(io_context), chunks_collected_(0)
 {
