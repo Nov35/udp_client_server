@@ -2,7 +2,7 @@
 
 #include "network.h"
 
-#include "send_repeater.h"
+#include "repeating_timer.h"
 
 #include <mutex>
 
@@ -43,10 +43,12 @@ private:
     asio::io_context &io_context_;
     Network network_;
     udp::endpoint server_endpoint_;
+
     const double range_constant_;
     asio::steady_timer first_delay_timer_;
     RepeatingTimer repeat_;
 
+    size_t chunks_collected_;
     std::vector<PayloadMessage::Ptr> buffer_;
     std::vector<double> collected_data_;
     std::mutex data_mutex_;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "send_repeater.h"
+#include "repeating_timer.h"
 
 #include <asio/io_context.hpp>
 #include <asio/steady_timer.hpp>
@@ -35,11 +35,11 @@ public:
     const std::vector<double>& GetData();
 
     void NextChunkOfData();
+    size_t GetCurrentIteration();
 
     DataChunk GetChunkOfData();
 
 private:
-    //! In real world example separate lock for each client might be needed
     size_t iteration_;
     ClientState state_;
     RepeatingTimer repeat_;

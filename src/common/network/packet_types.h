@@ -76,6 +76,7 @@ struct PacketCheckRequest : Packet
 {
     using Ptr = std::shared_ptr<PacketCheckRequest>;
 
+    uint32_t chunk_;
     uint8_t packets_sent_;
 
     virtual PacketType GetType() override

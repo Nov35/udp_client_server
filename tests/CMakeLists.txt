@@ -10,7 +10,7 @@ target_link_libraries(Storage PRIVATE
 )
 
 add_executable(UnitTests unit_tests.cpp)
-target_compile_options(UnitTests PUBLIC -fconcepts -std=gnu++2a)
+target_compile_options(UnitTests PUBLIC)
 
 
 target_link_libraries(UnitTests PRIVATE

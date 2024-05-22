@@ -46,6 +46,7 @@ void serialize(S &s, RangeSettingMessage &o)
 template <typename S>
 void serialize(S &s, PacketCheckRequest &o)
 {
+    s.value4b(o.chunk_);
     s.value1b(o.packets_sent_);
 }
 

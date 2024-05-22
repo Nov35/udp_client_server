@@ -52,6 +52,7 @@ ReceiveHandlingFuncs Server::GetCallbackList()
     return callbacks;
 }
 
+//TODO Add lock to avoid possible data during user deletion/state change
 void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
 {
     spdlog::error("{}:{}: Client rejected: {}",
@@ -129,31 +130,42 @@ void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint 
     auto chunk = context->GetChunkOfData();
 
     PacketCheckRequest::Ptr check_request = std::make_shared<PacketCheckRequest>();
+    check_request->chunk_ = context->GetCurrentIteration() + 1;
     check_request->packets_sent_ = chunk.GetPacketsCount();
 
     if (check_request->packets_sent_ == 0)
         clients_.Remove(client);
 
-    spdlog::info("{}:{} Sending request to check {} packets",
-                 client.address().to_string(), client.port(), check_request->packets_sent_);
+    spdlog::info("{}:{} Sending request to check {} packets from chunk {}.",
+                 client.address().to_string(), client.port(), check_request->packets_sent_,
+                 check_request->chunk_);
 
     context->SetState(ClientState::WaitingForPacketCheck);
-    network_.Send(check_request, client);
-    // context->Repeat()(std::bind(&Network::Send, &network_, check_request, client));
+
+    //! Figure out how and why client always receives the same first request
+    context->Repeat()(std::bind(&Network::Send, &network_, check_request, client));
 }
 
 void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::endpoint client)
 {
-    if (packet->major_version_ != project::major_version ||
-        packet->minor_version_ != project::minor_version)
+    if (packet->major_version_ == 0 &&
+        packet->minor_version_ == 0 &&
+        packet->patch_version_ == 0)
     {
-        SendErrorAndRemoveClient(client,
-                                 fmt::format("Unsupported version.\n\
-                                The server version is: {}, and client's version is: {}.{}.{}",
-                                             project::version_string, packet->major_version_,
-                                             packet->minor_version_, packet->patch_version_));
+        spdlog::warn("Ignorring corrupted init request packet");
         return;
     }
+
+        if (packet->major_version_ != project::major_version ||
+            packet->minor_version_ != project::minor_version)
+        {
+            SendErrorAndRemoveClient(client,
+                                     fmt::format("Unsupported version.\n\
+                                The server version is: {}, and client's version is: {}.{}.{}",
+                                                 project::version_string, packet->major_version_,
+                                                 packet->minor_version_, packet->patch_version_));
+            return;
+        }
 
     ClientContext *context = clients_.Add(client);
 
@@ -164,8 +176,8 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::e
         return;
     }
 
-    // context->Repeat().SetCallback([this, client]()
-    //                               { SendErrorAndRemoveClient(client, "Lost connetion. Removing client from storage."); });
+    context->Repeat().SetCallback([this, client]()
+                                  { SendErrorAndRemoveClient(client, "Lost connetion. Removing client from storage."); });
 
     spdlog::info("{}:{} Accepted",
                  client.address().to_string(), client.port());
@@ -205,7 +217,7 @@ void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet, co
 
 void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, const udp::endpoint client)
 {
-    
+
     ClientContext *context = clients_.Get(client);
 
     if (context == nullptr)

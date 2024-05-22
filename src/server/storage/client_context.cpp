@@ -50,6 +50,11 @@ void ClientContext::NextChunkOfData()
     ++iteration_;
 }
 
+size_t ClientContext::GetCurrentIteration()
+{
+    return iteration_;
+}
+
 DataChunk ClientContext::GetChunkOfData()
 {
     using namespace constants;

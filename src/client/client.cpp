@@ -14,7 +14,7 @@ Client::Client(asio::io_context &io_context, const std::string server_ip,
     : io_context_(io_context),
       network_(io_context, GetCallbackList()),
       range_constant_(range_constant), first_delay_timer_(io_context),
-      repeat_(io_context)
+      repeat_(io_context), chunks_collected_(0)
 {
     udp::resolver resolver(io_context);
 
@@ -65,8 +65,6 @@ ReceiveHandlingFuncs Client::GetCallbackList()
                       [this](udp::endpoint sender)
                       {
                           PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
-                          if (packet.get() == nullptr)
-                              spdlog::critical("Not allocated!!!");
                           network_.GetPacket(packet);
 
                           asio::post(io_context_.get_executor(),
@@ -102,11 +100,11 @@ void Client::SendRangeSetting()
 
 void Client::FlushBuffer()
 {
-    for (int i = 0; i < buffer_.size(); ++i)
-    {
-        for (int j = 0; j < buffer_[i]->payload_size_; ++j)
-            collected_data_.push_back(buffer_[i]->payload_[j]);
-    }
+   for(const auto& packet : buffer_)
+        for (int i = 0; i < packet->payload_size_; ++i)
+            collected_data_.push_back(packet->payload_[i]);
+
+    ++chunks_collected_;
     spdlog::trace("Flushing {} packets from buffer.", buffer_.size());
     buffer_.clear();
 }
@@ -156,16 +154,28 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
     {
         Lock lock(data_mutex_);
 
+        //! Untill repeated first request problem is not solved
+        // if (request->chunk_ <= chunks_collected_)
+        // {
+        //     spdlog::warn("Ignorring duplicate check request");
+        //     return;
+        // }
+
         if (request->packets_sent_ == 0)
             return ProcessData();
 
-        spdlog::info("Incoming packet check request. packets sent: {}", request->packets_sent_);
+        spdlog::info("Incoming packet check request to check {} packets from chunk: {}.", request->packets_sent_, request->chunk_);
+
+        if(!buffer_.back())
+            buffer_.pop_back();
 
         std::sort(buffer_.begin(), buffer_.end(), [](const auto &lhs, const auto &rhs)
                   { return lhs->packet_id_ < rhs->packet_id_; });
 
-        std::unique(buffer_.begin(), buffer_.end(), [](const auto &lhs, const auto &rhs)
+        auto new_end = std::unique(buffer_.begin(), buffer_.end(), [](const auto &lhs, const auto &rhs)
                     { return lhs->packet_id_ == rhs->packet_id_; });
+
+        buffer_.erase(new_end, buffer_.end());
 
         response->packets_missing_ = 0;
 
@@ -187,7 +197,9 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
             FlushBuffer();
     }
 
-    spdlog::warn("Requesting {} missing packets from server.", response->packets_missing_);
+    spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
+                 request->chunk_);
+
     network_.Send(response, sender);
 }
 

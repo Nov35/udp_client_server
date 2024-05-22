@@ -15,7 +15,6 @@ Network::Network(asio::io_context &io_context,
       packet_handle_callbacks_(packet_handle_callbacks)
 {
     socket_.open(udp::v4());
-    // socket_.set_option(asio::socket_base::receive_buffer_size(1000000));
 }
 
 Network::Network(asio::io_context &io_context, const uint16_t port,
@@ -24,13 +23,13 @@ Network::Network(asio::io_context &io_context, const uint16_t port,
       receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
-    // socket_.set_option(asio::socket_base::receive_buffer_size(1000000));
 }
 
 void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint)
 {
     BinaryData buffer;
     size_t data_size = Serialize(packet, buffer);
+
     socket_.async_send_to(asio::buffer(buffer, data_size), receiver_endpoint,
                           std::bind(&Network::HandleSend,
                                     this,
