@@ -15,10 +15,10 @@ private:
     ReceiveHandlingFuncs GetCallbackList();
 
     void SendErrorAndRemoveClient(udp::endpoint client, std::string_view error);
-    void SendChunkOfData(ClientContext *context, const udp::endpoint receiver);
+    void SendChunkOfData(LockedContext context, const udp::endpoint receiver);
     void ResendMissingPackets(const PacketCheckResponse::Ptr packet,
                               const udp::endpoint client);
-    void SendPacketCheckRequest(ClientContext *context, const udp::endpoint client);
+    void SendPacketCheckRequest(LockedContext context, const udp::endpoint client);
 
 private:
     void HandleInitialRequest(const InitialRequest::Ptr packet,

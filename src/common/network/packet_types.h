@@ -71,6 +71,7 @@ struct RangeSettingMessage : Packet
     {
         return PacketType::RangeSettingMessage;
     }
+    
     ~RangeSettingMessage() = default;
 };
 

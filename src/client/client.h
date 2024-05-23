@@ -17,7 +17,7 @@ public:
            const uint16_t port, const double range_constant);
 
     void start();
-    
+
 private:
     ReceiveHandlingFuncs GetCallbackList();
 

@@ -1,13 +1,21 @@
 #include "client_store.h"
-#include "spdlog/spdlog.h"
+
+#include "client_context_impl.h"
+
+#include <spdlog/spdlog.h>
 
 #include <memory>
 
-ClientStore::ClientStore(asio::io_context &io_context) : io_context_(io_context)
+ClientStore::ClientStore(asio::io_context &io_context) 
+ :io_context_(io_context)
 {
 }
 
-ClientContext *ClientStore::Add(const udp::endpoint endpoint)
+ClientStore::~ClientStore()
+{
+}
+
+LockedContext ClientStore::Add(const udp::endpoint endpoint)
 {
     Lock lock(store_mutex_);
 
@@ -18,12 +26,12 @@ ClientContext *ClientStore::Add(const udp::endpoint endpoint)
         return nullptr;
     }
 
-    auto [entry, result] = store_.emplace(endpoint, std::make_unique<ClientContext>(io_context_));
+    auto [entry, result] = store_.emplace(endpoint, std::make_unique<ClientContextImpl>(io_context_));
 
     return entry->second.get();
 }
 
-ClientContext *ClientStore::Get(const udp::endpoint endpoint)
+LockedContext ClientStore::Get(const udp::endpoint endpoint)
 {
     Lock lock(store_mutex_);
 

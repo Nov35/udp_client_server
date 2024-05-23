@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+//TODO add iterator compatible interface
 class DataChunk
 {
 public:

@@ -7,6 +7,8 @@
 
 #include <thread>
 
+//TODO Check server methods for possible deadlock
+
 Server::Server(asio::io_context &io_context, const uint16_t port)
     : network_(io_context, port, GetCallbackList()),
       pool_(std::thread::hardware_concurrency()),
@@ -52,7 +54,6 @@ ReceiveHandlingFuncs Server::GetCallbackList()
     return callbacks;
 }
 
-//TODO Add lock to avoid possible data during user deletion/state change
 void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
 {
     spdlog::error("{}:{}: Client rejected: {}",
@@ -67,9 +68,9 @@ void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::str
     network_.Send(response, client);
 }
 
-void Server::SendChunkOfData(ClientContext *context, const udp::endpoint receiver)
+void Server::SendChunkOfData(LockedContext context, const udp::endpoint receiver)
 {
-    auto chunk = context->GetChunkOfData();
+    auto chunk = context.GetChunkOfData();
 
     for (size_t i = 1; i <= chunk.GetPacketsCount(); ++i)
     {
@@ -86,20 +87,20 @@ void Server::SendChunkOfData(ClientContext *context, const udp::endpoint receive
         network_.Send(packet, receiver);
     }
 
-    SendPacketCheckRequest(context, receiver);
+    SendPacketCheckRequest(std::move(context), receiver);
 }
 
 void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const udp::endpoint client)
 {
-    ClientContext *context = clients_.Get(client);
+    LockedContext context = clients_.Get(client);
 
-    if (context == nullptr)
+    if (context.Empty())
         throw std::logic_error("User storage was removed during data transfer");
 
     spdlog::warn("{}:{}: Preparing {} missing packets",
                  client.address().to_string(), client.port(), packet->packets_missing_);
 
-    auto chunk = context->GetChunkOfData();
+    auto chunk = context.GetChunkOfData();
 
     for (size_t i = 0; i < packet->packets_missing_; ++i)
     {
@@ -108,7 +109,8 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
 
         if (begin == nullptr)
             return /*SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
-                                                                requested_packet))*/;
+                                                                requested_packet))*/
+                ;
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = requested_packet;
@@ -118,25 +120,25 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
         spdlog::trace("{}:{}: Sending packet id: {} Size: {}",
                       client.address().to_string(), client.port(), requested_packet, packet->payload_size_);
 
-        context->SetState(ClientState::WaitingForPacketCheck);
+        context.SetState(ClientState::WaitingForPacketCheck);
         network_.Send(packet, client);
     }
 
-    SendPacketCheckRequest(context, client);
+    SendPacketCheckRequest(std::move(context), client);
 }
 
-void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint client)
+void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint client)
 {
-    auto chunk = context->GetChunkOfData();
+    auto chunk = context.GetChunkOfData();
 
     PacketCheckRequest::Ptr check_request = std::make_shared<PacketCheckRequest>();
-    check_request->chunk_ = context->GetCurrentIteration() + 1;
+    check_request->chunk_ = context.GetCurrentIteration() + 1;
     check_request->packets_sent_ = chunk.GetPacketsCount();
 
     if (check_request->packets_sent_ == 0)
     {
         spdlog::info("{}:{} All packets were successfully received by client.\n",
-                 client.address().to_string(), client.port());
+                     client.address().to_string(), client.port());
         clients_.Remove(client);
     }
 
@@ -144,7 +146,7 @@ void Server::SendPacketCheckRequest(ClientContext *context, const udp::endpoint 
                  client.address().to_string(), client.port(), check_request->packets_sent_,
                  check_request->chunk_);
 
-    context->SetState(ClientState::WaitingForPacketCheck);
+    context.SetState(ClientState::WaitingForPacketCheck);
 
     network_.Send(check_request, client);
 }
@@ -159,20 +161,20 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::e
         return;
     }
 
-        if (packet->major_version_ != project::major_version ||
-            packet->minor_version_ != project::minor_version)
-        {
-            SendErrorAndRemoveClient(client,
-                                     fmt::format("Unsupported version.\n\
+    if (packet->major_version_ != project::major_version ||
+        packet->minor_version_ != project::minor_version)
+    {
+        SendErrorAndRemoveClient(client,
+                                 fmt::format("Unsupported version.\n\
                                 The server version is: {}, and client's version is: {}.{}.{}",
-                                                 project::version_string, packet->major_version_,
-                                                 packet->minor_version_, packet->patch_version_));
-            return;
-        }
+                                             project::version_string, packet->major_version_,
+                                             packet->minor_version_, packet->patch_version_));
+        return;
+    }
 
-    ClientContext *context = clients_.Add(client);
+    LockedContext context = clients_.Add(client);
 
-    if (context == nullptr)
+    if (context.Empty())
     {
         spdlog::warn("{}:{}: Duplicate initialization request",
                      client.address().to_string(), client.port());
@@ -190,12 +192,12 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr packet, const udp::e
 
 void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet, const udp::endpoint client)
 {
-    ClientContext *context = clients_.Get(client);
+    LockedContext context = clients_.Get(client);
 
-    if (context == nullptr)
+    if (context.Empty())
         return SendErrorAndRemoveClient(client, "Attempt to start transaction for client in incorrect state.");
 
-    if (context->GetState() != ClientState::Accepted)
+    if (context.GetState() != ClientState::Accepted)
     {
         spdlog::warn("Ignorring out of order or duplicate packet");
         return;
@@ -209,36 +211,36 @@ void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet, co
     spdlog::info("{}:{} Received range constant: {}",
                  client.address().to_string(), client.port(), packet->range_constant_);
 
-    context->SetState(ClientState::InProgress);
-    context->PrepareData(packet->range_constant_);
+    context.SetState(ClientState::InProgress);
+    context.PrepareData(packet->range_constant_);
 
-    SendChunkOfData(context, client);
+    SendChunkOfData(std::move(context), client);
 }
 
 void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, const udp::endpoint client)
 {
-    ClientContext *context = clients_.Get(client);
+    LockedContext context = clients_.Get(client);
 
-    if (context == nullptr)
+    if (context.Empty())
     {
         SendErrorAndRemoveClient(client, "Packet check was not requested.");
         return;
     }
 
-    if (context->GetState() != ClientState::WaitingForPacketCheck)
+    if (context.GetState() != ClientState::WaitingForPacketCheck)
     {
         spdlog::warn("Ignorring out of order or duplicate packet");
         return;
     }
 
-    context->SetState(ClientState::InProgress);
+    context.SetState(ClientState::InProgress);
 
     if (packet->packets_missing_ == 0)
     {
         spdlog::info("Sending next chunk of data");
 
-        context->NextChunkOfData();
-        return SendChunkOfData(context, client);
+        context.NextIteration();
+        return SendChunkOfData(std::move(context), client);
     }
 
     ResendMissingPackets(packet, client);

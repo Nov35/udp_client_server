@@ -1,42 +1,42 @@
 #pragma once
 
+#include "client_state.h"
+
 #include <asio/io_context.hpp>
 #include <asio/steady_timer.hpp>
 
 #include <vector>
 #include <memory>
+#include <mutex>
 
 class DataChunk;
 
-enum class ClientState
-{
-    Accepted,
-    InProgress,
-    WaitingForPacketCheck,
-    Done
-};
-
-class ClientContext
+//TODO Re-implement repeated sending with iteration check
+class ClientContextImpl
 {
 public:
-    using Ptr = std::unique_ptr<ClientContext>;
+    using Ptr = std::unique_ptr<ClientContextImpl>;
 
 public:
-    ClientContext(asio::io_context &io_context);
+    ClientContextImpl(asio::io_context &io_context);
 
     ClientState GetState();
     void SetState(const ClientState state);
-    
+
     void PrepareData(const double range);
     const std::vector<double>& GetData();
 
-    void NextChunkOfData();
+    DataChunk GetChunkOfData();
+    void NextIteration();
+
     size_t GetCurrentIteration();
 
-    DataChunk GetChunkOfData();
+    std::mutex& GetMutex();
 
 private:
     size_t iteration_;
     ClientState state_;
     std::vector<double> data_;
+    std::mutex mutex_;
+    bool is_waiting_;
 };

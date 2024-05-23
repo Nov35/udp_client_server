@@ -1,20 +1,25 @@
 #pragma once
 
-#include "client_context.h"
+#include "locked_context.h"
 
+#include <asio/io_context.hpp>
 #include <asio/ip/udp.hpp>
 
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 
+
 using asio::ip::udp;
+class ClientContextImpl;
 
 class ClientStore
 {
 public:
     ClientStore(asio::io_context &io_context);
-    ClientContext *Add(const udp::endpoint endpoint);
-    ClientContext *Get(const udp::endpoint endpoint);
+    ~ClientStore();
+    LockedContext Add(const udp::endpoint endpoint);
+    LockedContext Get(const udp::endpoint endpoint);
     bool Remove(const udp::endpoint endpoint);
 
 private:
@@ -22,6 +27,6 @@ private:
 
 private:
     asio::io_context &io_context_;
-    std::unordered_map<udp::endpoint, ClientContext::Ptr> store_;
+    std::unordered_map<udp::endpoint, std::unique_ptr<ClientContextImpl>> store_;
     std::mutex store_mutex_;
 };
