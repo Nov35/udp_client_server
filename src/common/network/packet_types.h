@@ -32,7 +32,15 @@ struct Packet
     virtual ~Packet() = default;
 };
 
-struct InitialRequest : Packet
+struct CommandPacket : Packet
+{
+    using Ptr = std::shared_ptr<CommandPacket>;
+
+    uint32_t chunk_;
+    ~CommandPacket() = default;
+};
+
+struct InitialRequest : CommandPacket
 {
     using Ptr = std::shared_ptr<InitialRequest>;
 
@@ -47,7 +55,7 @@ struct InitialRequest : Packet
     ~InitialRequest() = default;
 };
 
-struct ServerResponse : Packet
+struct ServerResponse : CommandPacket
 {
     using Ptr = std::shared_ptr<ServerResponse>;
 
@@ -61,7 +69,7 @@ struct ServerResponse : Packet
     ~ServerResponse() = default;
 };
 
-struct RangeSettingMessage : Packet
+struct RangeSettingMessage : CommandPacket
 {
     using Ptr = std::shared_ptr<RangeSettingMessage>;
 
@@ -75,11 +83,10 @@ struct RangeSettingMessage : Packet
     ~RangeSettingMessage() = default;
 };
 
-struct PacketCheckRequest : Packet
+struct PacketCheckRequest : CommandPacket
 {
     using Ptr = std::shared_ptr<PacketCheckRequest>;
 
-    uint32_t chunk_;
     uint8_t packets_sent_;
 
     virtual PacketType GetType() override
@@ -89,7 +96,7 @@ struct PacketCheckRequest : Packet
     ~PacketCheckRequest() = default;
 };
 
-struct PacketCheckResponse : Packet
+struct PacketCheckResponse : CommandPacket
 {
     using Ptr = std::shared_ptr<PacketCheckResponse>;
 

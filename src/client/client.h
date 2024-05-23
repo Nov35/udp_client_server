@@ -24,6 +24,9 @@ private:
     void MakeInitialRequest();
     void SendRangeSetting();
     void FlushBuffer();
+    void RepeatedlySend(const CommandPacket::Ptr packet,
+                        asio::chrono::milliseconds delay,
+                        asio::chrono::milliseconds max_delay);
 
 private:
     void HandleSeverResponse(const ServerResponse::Ptr response,
@@ -43,9 +46,10 @@ private:
     udp::endpoint server_endpoint_;
 
     const double range_constant_;
-    asio::steady_timer first_delay_timer_;
+    asio::steady_timer timer_;
+    bool is_waiting_for_resopnse;
 
-    size_t chunks_collected_;
+    size_t current_chunk_;
     std::vector<PayloadMessage::Ptr> buffer_;
     std::vector<double> collected_data_;
     std::mutex data_mutex_;

@@ -20,7 +20,7 @@ public:
     ~ClientStore();
     LockedContext Add(const udp::endpoint endpoint);
     LockedContext Get(const udp::endpoint endpoint);
-    bool Remove(const udp::endpoint endpoint);
+    void Remove(const udp::endpoint endpoint);
 
 private:
     using Lock = std::lock_guard<std::mutex>;

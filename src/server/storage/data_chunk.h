@@ -15,7 +15,7 @@ public:
 public:
     DataChunk(const double *begin, const double *end, const size_t count);
     const size_t GetPacketsCount();
-    Payload GetPayload(const size_t packet_num);
+    Payload GetPayload(const size_t packet_id);
 
 private:
     const double *begin_;

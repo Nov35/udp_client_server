@@ -4,6 +4,6 @@ enum class ClientState
 {
     Accepted,
     InProgress,
-    WaitingForPacketCheck,
+    WaitingForResponse,
     Done
 };

@@ -38,12 +38,17 @@ void LockedContext::NextIteration()
     context_ptr_->NextIteration();
 }
 
-size_t LockedContext::GetCurrentIteration()
+size_t LockedContext::CurrentChunk()
 {
-    return context_ptr_->GetCurrentIteration();
+    return context_ptr_->CurrentChunk();
 }
 
 bool LockedContext::Empty()
 {
     return context_ptr_ == nullptr;
+}
+
+void LockedContext::Unlock()
+{
+    lock_.unlock();
 }

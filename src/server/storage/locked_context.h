@@ -21,9 +21,10 @@ public:
 
     DataChunk GetChunkOfData();
     void NextIteration();
-    size_t GetCurrentIteration();
+    size_t CurrentChunk();
 
     bool Empty();
+    void Unlock();
 
 private:
     ClientContextImpl *context_ptr_;

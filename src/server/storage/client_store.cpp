@@ -6,8 +6,8 @@
 
 #include <memory>
 
-ClientStore::ClientStore(asio::io_context &io_context) 
- :io_context_(io_context)
+ClientStore::ClientStore(asio::io_context &io_context)
+    : io_context_(io_context)
 {
 }
 
@@ -39,7 +39,7 @@ LockedContext ClientStore::Get(const udp::endpoint endpoint)
 
     if (entry == store_.end())
     {
-        spdlog::error("Attempt to access non-existent user context for endpoint {}:{}",
+        spdlog::trace("Attempt to access non-existent user context for endpoint {}:{}",
                       endpoint.address().to_string(), endpoint.port());
         return LockedContext();
     }
@@ -47,25 +47,17 @@ LockedContext ClientStore::Get(const udp::endpoint endpoint)
     return LockedContext(entry->second.get());
 }
 
-bool ClientStore::Remove(const udp::endpoint endpoint)
+void ClientStore::Remove(const udp::endpoint endpoint)
 {
     Lock lock(store_mutex_);
 
     auto entry = store_.find(endpoint);
     if (entry == store_.end())
-        return false;
-    
-    auto& mutex = entry->second.get()->GetMutex();
+        return;
 
-    if (mutex.try_lock())
-    {
-        mutex.unlock();
-        store_.erase(entry);
-    }
-    else
-    {
-        return false;
-    }
+    auto &mutex = entry->second.get()->GetMutex();
 
-    return true;
+    mutex.lock();
+    mutex.unlock();
+    store_.erase(entry);
 }

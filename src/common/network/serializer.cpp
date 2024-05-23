@@ -23,8 +23,15 @@ void serialize(S &s, Packet &o)
 }
 
 template <typename S>
+void serialize(S &s, CommandPacket &o)
+{
+    s.value4b(o.chunk_);
+}
+
+template <typename S>
 void serialize(S &s, InitialRequest &o)
 {
+    s.ext(o, BaseClass<CommandPacket>{});
     s.value1b(o.major_version_);
     s.value1b(o.minor_version_);
     s.value1b(o.patch_version_);
@@ -33,6 +40,7 @@ void serialize(S &s, InitialRequest &o)
 template <typename S>
 void serialize(S &s, ServerResponse &o)
 {
+    s.ext(o, BaseClass<CommandPacket>{});
     s.value1b(o.is_successful_);
     s.text1b(o.message_, constants::max_error_length);
 }
@@ -40,19 +48,21 @@ void serialize(S &s, ServerResponse &o)
 template <typename S>
 void serialize(S &s, RangeSettingMessage &o)
 {
+    s.ext(o, BaseClass<CommandPacket>{});
     s.value8b(o.range_constant_);
 }
 
 template <typename S>
 void serialize(S &s, PacketCheckRequest &o)
 {
-    s.value4b(o.chunk_);
+    s.ext(o, BaseClass<CommandPacket>{});
     s.value1b(o.packets_sent_);
 }
 
 template <typename S>
 void serialize(S &s, PacketCheckResponse &o)
 {
+    s.ext(o, BaseClass<CommandPacket>{});
     s.value1b(o.packets_missing_);
     s.container1b(o.missing_packets_);
 }
@@ -69,18 +79,22 @@ namespace bitsery
 {
     namespace ext
     {
-
         template <>
         struct PolymorphicBaseClass<Packet>
-            : PolymorphicDerivedClasses<InitialRequest,
-                                        ServerResponse,
-                                        RangeSettingMessage,
-                                        PacketCheckRequest,
-                                        PacketCheckResponse,
+            : PolymorphicDerivedClasses<CommandPacket,
                                         PayloadMessage>
         {
         };
 
+        template <>
+        struct PolymorphicBaseClass<CommandPacket>
+            : PolymorphicDerivedClasses<InitialRequest,
+                                        ServerResponse,
+                                        RangeSettingMessage,
+                                        PacketCheckRequest,
+                                        PacketCheckResponse>
+        {
+        };
     }
 }
 

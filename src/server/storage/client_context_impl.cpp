@@ -7,7 +7,7 @@
 #include <random>
 
 ClientContextImpl::ClientContextImpl(asio::io_context &io_context)
-    : iteration_(0), state_()
+    : iteration_(0), state_(ClientState::Accepted)
 {
 }
 
@@ -45,9 +45,9 @@ void ClientContextImpl::NextIteration()
     ++iteration_;
 }
 
-size_t ClientContextImpl::GetCurrentIteration()
+size_t ClientContextImpl::CurrentChunk()
 {
-    return iteration_;
+    return iteration_ + 1;
 }
 
 DataChunk ClientContextImpl::GetChunkOfData()

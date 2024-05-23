@@ -15,18 +15,20 @@ public:
 private:
     ReceiveHandlingFuncs GetCallbackList();
 
-    void SendErrorAndRemoveClient(udp::endpoint client, std::string_view error);
-    void SendChunkOfData(LockedContext context, const udp::endpoint receiver);
-    void ResendMissingPackets(const PacketCheckResponse::Ptr packet,
-                              const udp::endpoint client);
+    void SendChunkOfData(LockedContext context, const udp::endpoint client);
     void SendPacketCheckRequest(LockedContext context, const udp::endpoint client);
+    void RepeatedlySend(const CommandPacket::Ptr packet, const udp::endpoint client,
+                        asio::chrono::milliseconds delay = asio::chrono::milliseconds(50));
+    void ResendMissingPackets(const PacketCheckResponse::Ptr response,
+                              const udp::endpoint client);
+    void SendErrorAndRemoveClient(udp::endpoint client, std::string_view error);
 
 private:
-    void HandleInitialRequest(const InitialRequest::Ptr packet,
+    void HandleInitialRequest(const InitialRequest::Ptr request,
                               const udp::endpoint client);
-    void HandleRangeSettingMessage(const RangeSettingMessage::Ptr packet,
+    void HandleRangeSettingMessage(const RangeSettingMessage::Ptr setting,
                                    const udp::endpoint client);
-    void HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet,
+    void HandlePacketCheckResponse(const PacketCheckResponse::Ptr response,
                                    const udp::endpoint client);
 
 private:

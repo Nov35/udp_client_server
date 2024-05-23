@@ -29,7 +29,7 @@ public:
     DataChunk GetChunkOfData();
     void NextIteration();
 
-    size_t GetCurrentIteration();
+    size_t CurrentChunk();
 
     std::mutex& GetMutex();
 
@@ -38,5 +38,4 @@ private:
     ClientState state_;
     std::vector<double> data_;
     std::mutex mutex_;
-    bool is_waiting_;
 };
