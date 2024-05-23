@@ -4,6 +4,7 @@
 #include "storage/client_store.h"
 
 #include <asio/ip/udp.hpp>
+#include <asio/steady_timer.hpp>
 #include <asio/thread_pool.hpp>
 
 class Server
@@ -31,5 +32,6 @@ private:
 private:
     Network network_;
     asio::thread_pool pool_;
+    asio::steady_timer timer_;
     ClientStore clients_;
 };

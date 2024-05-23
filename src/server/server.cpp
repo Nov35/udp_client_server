@@ -7,12 +7,12 @@
 
 #include <thread>
 
-//TODO Check server methods for possible deadlock
+// TODO Check server methods for possible deadlock
 
 Server::Server(asio::io_context &io_context, const uint16_t port)
     : network_(io_context, port, GetCallbackList()),
       pool_(std::thread::hardware_concurrency()),
-      clients_(io_context)
+      clients_(io_context), timer_(io_context)
 {
     network_.Receive();
 }
@@ -56,10 +56,14 @@ ReceiveHandlingFuncs Server::GetCallbackList()
 
 void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
 {
-    spdlog::error("{}:{}: Client rejected: {}",
-                  client.address().to_string(), client.port(), error);
+    if(!clients_.Remove(client))
+    {
+        timer_.expires_from_now(asio::chrono::milliseconds(50));
+        timer_.async_wait(std::bind(&Server::SendErrorAndRemoveClient, this, client, error));
+    }
 
-    clients_.Remove(client);
+    spdlog::error("{}:{}: Client rejected: {}",
+                client.address().to_string(), client.port(), error);
 
     ServerResponse::Ptr response = std::make_shared<ServerResponse>();
     response->is_successful_ = false;
@@ -108,9 +112,11 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr packet, const u
         auto [begin, end] = chunk.GetPayload(requested_packet);
 
         if (begin == nullptr)
-            return /*SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
-                                                                requested_packet))*/
-                ;
+        {
+            SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
+                                                         requested_packet));
+            return;
+        }
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = requested_packet;
@@ -223,7 +229,7 @@ void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr packet, co
 
     if (context.Empty())
     {
-        SendErrorAndRemoveClient(client, "Packet check was not requested.");
+        spdlog::warn("Check request for non-existing client.");
         return;
     }
 

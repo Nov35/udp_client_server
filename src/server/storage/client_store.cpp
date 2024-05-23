@@ -54,8 +54,18 @@ bool ClientStore::Remove(const udp::endpoint endpoint)
     auto entry = store_.find(endpoint);
     if (entry == store_.end())
         return false;
+    
+    auto& mutex = entry->second.get()->GetMutex();
 
-    store_.erase(entry);
+    if (mutex.try_lock())
+    {
+        mutex.unlock();
+        store_.erase(entry);
+    }
+    else
+    {
+        return false;
+    }
 
     return true;
 }
