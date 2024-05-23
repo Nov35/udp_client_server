@@ -3,6 +3,11 @@
 #include "client_context_impl.h"
 #include "data_chunk.h"
 
+LockedContext::LockedContext()
+    : context_ptr_(nullptr)
+{
+}
+
 LockedContext::LockedContext(ClientContextImpl *ptr)
     : context_ptr_(ptr), lock_(ptr->GetMutex())
 {

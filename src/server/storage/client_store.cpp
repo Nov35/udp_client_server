@@ -23,12 +23,12 @@ LockedContext ClientStore::Add(const udp::endpoint endpoint)
     {
         spdlog::error("Cannot insert user context for endpoint {}:{} to the store since it's already present",
                       endpoint.address().to_string(), endpoint.port());
-        return nullptr;
+        return LockedContext();
     }
 
     auto [entry, result] = store_.emplace(endpoint, std::make_unique<ClientContextImpl>(io_context_));
 
-    return entry->second.get();
+    return LockedContext(entry->second.get());
 }
 
 LockedContext ClientStore::Get(const udp::endpoint endpoint)
@@ -41,10 +41,10 @@ LockedContext ClientStore::Get(const udp::endpoint endpoint)
     {
         spdlog::error("Attempt to access non-existent user context for endpoint {}:{}",
                       endpoint.address().to_string(), endpoint.port());
-        return nullptr;
+        return LockedContext();
     }
 
-    return entry->second.get();
+    return LockedContext(entry->second.get());
 }
 
 bool ClientStore::Remove(const udp::endpoint endpoint)

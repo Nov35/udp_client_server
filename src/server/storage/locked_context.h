@@ -11,6 +11,7 @@ class DataChunk;
 class LockedContext
 {
 public:
+    LockedContext();
     LockedContext(ClientContextImpl *ptr);
 
     ClientState GetState();
