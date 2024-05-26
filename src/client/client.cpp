@@ -9,6 +9,8 @@
 #include <functional>
 #include <fstream>
 
+using asio::chrono::milliseconds;
+
 Client::Client(asio::io_context &io_context, const std::string server_ip,
                const uint16_t port, const double range_constant)
     : io_context_(io_context),
@@ -35,8 +37,7 @@ ReceiveHandlingFuncs Client::GetCallbackList()
     callbacks.insert({PacketType::ServerResponse,
                       [this](udp::endpoint sender)
                       {
-                          ServerResponse::Ptr packet = std::make_shared<ServerResponse>();
-                          network_.GetPacket(packet);
+                          ServerResponse::Ptr packet = network_.GetReceivedPacket<ServerResponse>();
 
                           asio::post(io_context_.get_executor(),
                                      std::bind(&Client::HandleSeverResponse,
@@ -46,8 +47,7 @@ ReceiveHandlingFuncs Client::GetCallbackList()
     callbacks.insert({PacketType::PacketCheckRequest,
                       [this](udp::endpoint sender)
                       {
-                          PacketCheckRequest::Ptr packet = std::make_shared<PacketCheckRequest>();
-                          network_.GetPacket(packet);
+                          PacketCheckRequest::Ptr packet = network_.GetReceivedPacket<PacketCheckRequest>();
 
                           asio::post(io_context_.get_executor(),
                                      std::bind(&Client::HandlePacketCheckRequest,
@@ -57,8 +57,7 @@ ReceiveHandlingFuncs Client::GetCallbackList()
     callbacks.insert({PacketType::PayloadMessage,
                       [this](udp::endpoint sender)
                       {
-                          PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
-                          network_.GetPacket(packet);
+                          PayloadMessage::Ptr packet = network_.GetReceivedPacket<PayloadMessage>();
 
                           asio::post(io_context_.get_executor(),
                                      std::bind(&Client::HandlePayloadMessage,
@@ -79,8 +78,8 @@ void Client::MakeInitialRequest()
 
     spdlog::info("Sending version info to server. Version: {}", project::version_string);
     is_waiting_for_resopnse = true;
-    // RepeatedlySend(request, asio::chrono::milliseconds(500), asio::chrono::milliseconds(500));
-    network_.Send(request, server_endpoint_);
+    // RepeatedlySend(request, asio::chrono::milliseconds(500), asio::chrono::milliseconds(5000));
+    network_.SerializeAndSend(request, server_endpoint_);
 }
 
 void Client::SendRangeSetting()
@@ -91,10 +90,8 @@ void Client::SendRangeSetting()
     setting->range_constant_ = range_constant_;
     setting->chunk_ = 1;
 
-    network_.Send(setting, server_endpoint_);
-
     is_waiting_for_resopnse = true;
-    network_.Send(setting, server_endpoint_);
+    network_.SerializeAndSend(setting, server_endpoint_);
     // RepeatedlySend(setting, asio::chrono::milliseconds(10'000), asio::chrono::milliseconds(20'000));
 }
 
@@ -109,34 +106,34 @@ void Client::FlushBuffer()
     buffer_.clear();
 }
 
-void Client::RepeatedlySend(const CommandPacket::Ptr packet, asio::chrono::milliseconds delay,
-                            asio::chrono::milliseconds max_delay)
-{
-    std::scoped_lock(data_mutex_);
+// void Client::RepeatedlySend(const CommandPacket::Ptr packet, asio::chrono::milliseconds delay,
+//                             asio::chrono::milliseconds max_delay)
+// {
+//     std::scoped_lock lock(data_mutex_);
 
-    if (!is_waiting_for_resopnse ||
-        packet->chunk_ < current_chunk_)
-        return;
+//     if (!is_waiting_for_resopnse ||
+//         packet->chunk_ < current_chunk_)
+//         return;
 
-    if (delay > max_delay)
-    {
-        spdlog::error("Timeout exceeded. No response from server.");
-        io_context_.stop();
-        exit;
-    }
+//     if (delay > max_delay)
+//     {
+//         spdlog::error("Timeout exceeded. No response from server.");
+//         io_context_.stop();
+//         exit(1);
+//     }
 
-    network_.Send(packet, server_endpoint_);
+//     network_.SerializeAndSend(packet, server_endpoint_);
 
-    timer_.expires_from_now(delay);
-    timer_.async_wait(std::bind(&Client::RepeatedlySend,
-                                this, packet, delay * 2, max_delay));
-}
+//     timer_.expires_from_now(delay);
+//     timer_.async_wait(std::bind(&Client::RepeatedlySend,
+//                                 this, packet, delay * 2, max_delay));
+// }
 
 void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::endpoint sender)
 {
     is_waiting_for_resopnse = false;
 
-    if(response->chunk_ < current_chunk_)
+    if (response->chunk_ < current_chunk_)
         return;
 
     // TODO Separate initialization and error handling logic
@@ -178,16 +175,20 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 {
     PacketCheckResponse::Ptr response = std::make_shared<PacketCheckResponse>();
 
+    if (request->chunk_ < current_chunk_)
+    {
+        is_waiting_for_resopnse = true;
+        response->chunk_ = request->chunk_;
+        response->packets_missing_ = 0;
+        // RepeatedlySend(response, milliseconds(100), milliseconds(5000));
+        network_.SerializeAndSend(response, server_endpoint_);
+
+        return;
+    }
+
     {
         Lock lock(data_mutex_);
-
-        if (request->chunk_ < current_chunk_)
-        {
-            spdlog::warn("Ignorring duplicate check request {} {}",
-                         request->chunk_, current_chunk_);
-            return;
-        }
-
+        
         if (request->packets_sent_ == 0)
             return ProcessData();
 
@@ -223,14 +224,14 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
         if (response->packets_missing_ == 0)
             FlushBuffer();
+
+        spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
+                     request->chunk_);
+
+        is_waiting_for_resopnse = true;
     }
-
-    spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
-                 request->chunk_);
-
-    is_waiting_for_resopnse = true;
-
-    network_.Send(response, server_endpoint_);
+    network_.SerializeAndSend(response, server_endpoint_);
+    // RepeatedlySend(response, milliseconds(100), milliseconds(5000));
 }
 
 void Client::ProcessData()
@@ -241,7 +242,7 @@ void Client::ProcessData()
     auto path = utils::CurrentExecutableFilePath().replace_filename("data.bin");
     std::ofstream binary_file(path, std::ofstream::binary);
 
-    if(!binary_file)
+    if (!binary_file)
         throw std::runtime_error("Can't open file for writing");
 
     const size_t data_size = collected_data_.size() * sizeof(collected_data_.front());
@@ -251,5 +252,5 @@ void Client::ProcessData()
     binary_file.close();
     io_context_.stop();
 
-    exit;
+    exit(0);
 }

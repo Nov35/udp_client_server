@@ -5,13 +5,15 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstring>
 #include <thread>
 
 // TODO Check server methods for possible deadlock
 
 Server::Server(asio::io_context &io_context, const uint16_t port)
     : network_(io_context, port, GetCallbackList()),
-      pool_(std::thread::hardware_concurrency()),
+      io_context_(io_context),
+      //   pool_(std::thread::hardware_concurrency()),
       clients_(io_context), timer_(io_context)
 {
     network_.Receive();
@@ -24,31 +26,26 @@ ReceiveHandlingFuncs Server::GetCallbackList()
     callbacks.insert({PacketType::InitialRequest,
                       [this](udp::endpoint sender)
                       {
-                          InitialRequest::Ptr packet = std::make_shared<InitialRequest>();
-                          network_.GetPacket(packet);
-
-                          asio::post(pool_, std::bind(&Server::HandleInitialRequest,
-                                                      this, packet, sender));
+                          InitialRequest::Ptr packet = network_.GetReceivedPacket<InitialRequest>();
+                          asio::post(io_context_.get_executor(), std::bind(&Server::HandleInitialRequest, this, packet, sender));
                       }});
 
     callbacks.insert({PacketType::RangeSettingMessage,
                       [this](udp::endpoint sender)
                       {
-                          RangeSettingMessage::Ptr packet = std::make_shared<RangeSettingMessage>();
-                          network_.GetPacket(packet);
+                          RangeSettingMessage::Ptr packet = network_.GetReceivedPacket<RangeSettingMessage>();
 
-                          asio::post(pool_, std::bind(&Server::HandleRangeSettingMessage,
-                                                      this, packet, sender));
+                          asio::post(io_context_.get_executor(), std::bind(&Server::HandleRangeSettingMessage,
+                                                                           this, packet, sender));
                       }});
 
     callbacks.insert({PacketType::PacketCheckResponse,
                       [this](udp::endpoint sender)
                       {
-                          PacketCheckResponse::Ptr packet = std::make_shared<PacketCheckResponse>();
-                          network_.GetPacket(packet);
+                          PacketCheckResponse::Ptr packet = network_.GetReceivedPacket<PacketCheckResponse>();
 
-                          asio::post(pool_, std::bind(&Server::HandlePacketCheckResponse,
-                                                      this, packet, sender));
+                          asio::post(io_context_.get_executor(), std::bind(&Server::HandlePacketCheckResponse,
+                                                                           this, packet, sender));
                       }});
 
     return callbacks;
@@ -70,7 +67,7 @@ void Server::SendChunkOfData(LockedContext context, const udp::endpoint client)
         spdlog::trace("{}:{}: Sending packet id: {} Size: {}",
                       client.address().to_string(), client.port(), i, packet->payload_size_);
 
-        network_.Send(packet, client);
+        network_.SerializeAndSend(packet, client);
     }
 
     SendPacketCheckRequest(std::move(context), client);
@@ -109,7 +106,7 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr response, const
         spdlog::trace("{}:{}: Sending packet id: {} Size: {}",
                       client.address().to_string(), client.port(), requested_packet, packet->payload_size_);
 
-        network_.Send(packet, client);
+        network_.SerializeAndSend(packet, client);
     }
 
     SendPacketCheckRequest(std::move(context), client);
@@ -131,7 +128,7 @@ void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint c
 
     context.Unlock();
 
-    RepeatedlySend(check_request, client);
+    network_.SerializeAndSend(check_request, client);
 
     if (check_request->packets_sent_ == 0)
     {
@@ -141,30 +138,33 @@ void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint c
     }
 }
 
-void Server::RepeatedlySend(const CommandPacket::Ptr packet, const udp::endpoint client,
-                            asio::chrono::milliseconds delay)
-{
-    LockedContext context = clients_.Get(client);
+// void Server::RepeatedlySend(const CommandPacket::Ptr packet, const udp::endpoint client,
+//                             asio::chrono::milliseconds delay)
+// {
+//     LockedContext context = clients_.Get(client);
 
-    if (context.Empty())
-        return;
+//     spdlog::info("enter chunk{}, delay = {}" ,packet->chunk_, delay.count());
 
-    if (packet->chunk_ < context.CurrentChunk() || context.GetState() != ClientState::WaitingForResponse)
-        return;
+//     if (context.Empty())
+//         return;
 
-    if (delay > asio::chrono::milliseconds(5000))
-    {
-        context.Unlock();
-        SendErrorAndRemoveClient(client, "Timeout exceeded. No response from the client.");
-        return;
-    }
+//     if (packet->chunk_ < context.CurrentChunk() ||
+//         context.GetState() != ClientState::WaitingForResponse)
+//         return;
 
-    network_.Send(packet, client);
+//     if (delay > asio::chrono::milliseconds(50000))
+//     {
+//         context.Unlock();
+//         SendErrorAndRemoveClient(client, fmt::format("Timeout exceeded. No response from the client for chunk: {}.", packet->chunk_));
+//         return;
+//     }
 
-    timer_.expires_from_now(delay);
-    timer_.async_wait(std::bind(&Server::RepeatedlySend,
-                                this, packet, client, delay * 2));
-}
+//     network_.SerializeAndSend(packet, client);
+
+//     timer_.expires_from_now(asio::chrono::milliseconds(2000));
+//     timer_.async_wait(std::bind(&Server::RepeatedlySend,
+//                                 this, packet, client, delay * 10));
+// }
 
 void Server::HandleInitialRequest(const InitialRequest::Ptr request, const udp::endpoint client)
 {
@@ -203,7 +203,7 @@ void Server::HandleInitialRequest(const InitialRequest::Ptr request, const udp::
     response->chunk_ = 1;
     response->is_successful_ = true;
 
-    network_.Send(response, client);
+    network_.SerializeAndSend(response, client);
 }
 
 void Server::HandleRangeSettingMessage(const RangeSettingMessage::Ptr setting, const udp::endpoint client)
@@ -268,14 +268,15 @@ void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr response, 
 
 void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
 {
-    asio::post(pool_, std::bind(&ClientStore::Remove, &clients_, client));
+    asio::post(io_context_.get_executor(), std::bind(&ClientStore::Remove, &clients_, client));
 
     spdlog::error("{}:{}: Client rejected: {}",
                   client.address().to_string(), client.port(), error);
 
     ServerResponse::Ptr response = std::make_shared<ServerResponse>();
     response->is_successful_ = false;
-    response->message_ = error;
+    response->msg_lenght_ = error.length();
+    std::strcpy(response->message_, error.data());
 
-    network_.Send(response, client);
+    network_.SerializeAndSend(response, client);
 }

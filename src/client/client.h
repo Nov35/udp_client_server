@@ -24,9 +24,9 @@ private:
     void MakeInitialRequest();
     void SendRangeSetting();
     void FlushBuffer();
-    void RepeatedlySend(const CommandPacket::Ptr packet,
-                        asio::chrono::milliseconds delay,
-                        asio::chrono::milliseconds max_delay);
+    // void RepeatedlySend(const CommandPacket::Ptr packet,
+    //                     asio::chrono::milliseconds delay,
+    //                     asio::chrono::milliseconds max_delay);
 
 private:
     void HandleSeverResponse(const ServerResponse::Ptr response,

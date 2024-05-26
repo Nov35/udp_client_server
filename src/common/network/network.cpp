@@ -1,7 +1,5 @@
 #include "network.h"
 
-#include "serializer.h"
-
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
 
@@ -30,19 +28,6 @@ Network::Network(asio::io_context &io_context, const uint16_t port,
 {
 }
 
-void Network::Send(const Packet::Ptr packet, const udp::endpoint receiver_endpoint)
-{
-    BinaryData buffer(constants::max_packet_size);
-    size_t data_size = Serialize(packet, buffer);
-
-    socket_.async_send_to(asio::buffer(buffer.data(), data_size), receiver_endpoint,
-                          std::bind(&Network::HandleSend,
-                                    this,
-                                    asio::placeholders::error,
-                                    asio::placeholders::bytes_transferred,
-                                    receiver_endpoint));
-}
-
 void Network::Receive()
 {
     socket_.async_receive_from(asio::buffer(receive_buffer_), last_sender_,
@@ -52,9 +37,14 @@ void Network::Receive()
                                          asio::placeholders::bytes_transferred));
 }
 
-void Network::GetPacket(Packet::Ptr destination)
+void Network::SendFromBuffer(size_t data_size, const udp::endpoint receiver_endpoint)
 {
-    Deserialize(receive_buffer_, destination);
+    socket_.async_send_to(asio::buffer(send_buffer_.data(), data_size), receiver_endpoint,
+                          std::bind(&Network::HandleSend,
+                                    this,
+                                    asio::placeholders::error,
+                                    asio::placeholders::bytes_transferred,
+                                    receiver_endpoint));
 }
 
 void Network::HandleSend(const std::error_code &error, const size_t bytes_transferred,
@@ -81,6 +71,7 @@ void Network::HandleReceive(const std::error_code &error,
         return Receive();
     }
 
+    bytes_received_ = bytes_received;
     PacketType type = static_cast<PacketType>(receive_buffer_[0]);
 
     if (!packet_handle_callbacks_.contains(type))

@@ -34,8 +34,14 @@ int main()
 
         spdlog::info("Initializing server on port: {}", settings.port_);
         Server server(io_context, settings.port_);
-
+        std::vector<std::thread> thread_pool;
+        for (size_t i = 0; i < std::thread::hardware_concurrency() / 2; ++i)
+        {
+            thread_pool.push_back(std::thread([&io_context](){io_context.run();}));
+        }
         io_context.run();
+        for(auto& thread : thread_pool)
+            thread.join();
     }
     catch (std::exception &e)
     {

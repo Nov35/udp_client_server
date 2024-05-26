@@ -2,6 +2,7 @@
 
 #include "constants.h"
 
+#include <bit>
 #include <memory>
 #include <vector>
 #include <string>
@@ -28,19 +29,11 @@ struct Packet
 {
     using Ptr = std::shared_ptr<Packet>;
 
-    virtual PacketType GetType() = 0;
-    virtual ~Packet() = default;
-};
-
-struct CommandPacket : Packet
-{
-    using Ptr = std::shared_ptr<CommandPacket>;
-
+    PacketType type_;
     uint32_t chunk_;
-    ~CommandPacket() = default;
 };
 
-struct InitialRequest : CommandPacket
+struct InitialRequest : Packet
 {
     using Ptr = std::shared_ptr<InitialRequest>;
 
@@ -48,66 +41,63 @@ struct InitialRequest : CommandPacket
     uint8_t minor_version_;
     uint8_t patch_version_;
 
-    virtual PacketType GetType() override
+    uint8_t endianness_;
+
+    PacketType GetType() const
     {
         return PacketType::InitialRequest;
     }
-    ~InitialRequest() = default;
 };
 
-struct ServerResponse : CommandPacket
+struct ServerResponse : Packet
 {
     using Ptr = std::shared_ptr<ServerResponse>;
 
     bool is_successful_;
-    std::string message_;
+    uint16_t msg_lenght_;
+    char message_[constants::max_msg_length];
 
-    virtual PacketType GetType() override
+    PacketType GetType() const
     {
         return PacketType::ServerResponse;
     }
-    ~ServerResponse() = default;
 };
 
-struct RangeSettingMessage : CommandPacket
+struct RangeSettingMessage : Packet
 {
     using Ptr = std::shared_ptr<RangeSettingMessage>;
 
     double range_constant_;
 
-    virtual PacketType GetType() override
+    PacketType GetType() const
     {
         return PacketType::RangeSettingMessage;
     }
-    
-    ~RangeSettingMessage() = default;
 };
 
-struct PacketCheckRequest : CommandPacket
+struct PacketCheckRequest : Packet
 {
     using Ptr = std::shared_ptr<PacketCheckRequest>;
 
     uint8_t packets_sent_;
 
-    virtual PacketType GetType() override
+    PacketType GetType() const
     {
         return PacketType::PacketCheckRequest;
     }
-    ~PacketCheckRequest() = default;
 };
 
-struct PacketCheckResponse : CommandPacket
+struct PacketCheckResponse : Packet
 {
     using Ptr = std::shared_ptr<PacketCheckResponse>;
 
     uint8_t packets_missing_;
     uint8_t missing_packets_[constants::packets_chunk_size];
 
-    virtual PacketType GetType() override
+    PacketType GetType() const
     {
         return PacketType::PacketCheckResponse;
     }
-    ~PacketCheckResponse() = default;
 };
 
 struct PayloadMessage : Packet
@@ -118,10 +108,8 @@ struct PayloadMessage : Packet
     uint8_t payload_size_;
     Payload payload_;
 
-    virtual PacketType GetType() override
+    PacketType GetType() const
     {
         return PacketType::PayloadMessage;
     }
-
-    ~PayloadMessage() = default;
 };
