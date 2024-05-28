@@ -5,6 +5,7 @@
 
 #include <asio/io_context.hpp>
 #include <spdlog/spdlog.h>
+#include  <asio/steady_timer.hpp>
 
 #include <functional>
 #include <fstream>
@@ -16,7 +17,7 @@ Client::Client(asio::io_context &io_context, const std::string server_ip,
     : io_context_(io_context),
       network_(io_context, GetCallbackList(), server_ip, port),
       range_constant_(range_constant), timer_(io_context),
-      is_waiting_for_resopnse(false), current_chunk_(1)
+       current_chunk_(1)
 {
     udp::resolver resolver(io_context);
 
@@ -77,8 +78,6 @@ void Client::MakeInitialRequest()
     request->chunk_ = 1;
 
     spdlog::info("Sending version info to server. Version: {}", project::version_string);
-    is_waiting_for_resopnse = true;
-    // RepeatedlySend(request, asio::chrono::milliseconds(500), asio::chrono::milliseconds(5000));
     network_.SerializeAndSend(request, server_endpoint_);
 }
 
@@ -90,9 +89,7 @@ void Client::SendRangeSetting()
     setting->range_constant_ = range_constant_;
     setting->chunk_ = 1;
 
-    is_waiting_for_resopnse = true;
     network_.SerializeAndSend(setting, server_endpoint_);
-    // RepeatedlySend(setting, asio::chrono::milliseconds(10'000), asio::chrono::milliseconds(20'000));
 }
 
 void Client::FlushBuffer()
@@ -106,33 +103,8 @@ void Client::FlushBuffer()
     buffer_.clear();
 }
 
-// void Client::RepeatedlySend(const CommandPacket::Ptr packet, asio::chrono::milliseconds delay,
-//                             asio::chrono::milliseconds max_delay)
-// {
-//     std::scoped_lock lock(data_mutex_);
-
-//     if (!is_waiting_for_resopnse ||
-//         packet->chunk_ < current_chunk_)
-//         return;
-
-//     if (delay > max_delay)
-//     {
-//         spdlog::error("Timeout exceeded. No response from server.");
-//         io_context_.stop();
-//         exit(1);
-//     }
-
-//     network_.SerializeAndSend(packet, server_endpoint_);
-
-//     timer_.expires_from_now(delay);
-//     timer_.async_wait(std::bind(&Client::RepeatedlySend,
-//                                 this, packet, delay * 2, max_delay));
-// }
-
 void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::endpoint sender)
 {
-    is_waiting_for_resopnse = false;
-
     if (response->chunk_ < current_chunk_)
         return;
 
@@ -152,8 +124,6 @@ void Client::HandleSeverResponse(const ServerResponse::Ptr response, const udp::
 
 void Client::HandlePayloadMessage(const PayloadMessage::Ptr packet, const udp::endpoint sender)
 {
-    is_waiting_for_resopnse = false;
-
     Lock lock(data_mutex_);
 
     if (packet.get() == nullptr)
@@ -177,10 +147,8 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
     if (request->chunk_ < current_chunk_)
     {
-        is_waiting_for_resopnse = true;
         response->chunk_ = request->chunk_;
         response->packets_missing_ = 0;
-        // RepeatedlySend(response, milliseconds(100), milliseconds(5000));
         network_.SerializeAndSend(response, server_endpoint_);
 
         return;
@@ -227,11 +195,8 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
         spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
                      request->chunk_);
-
-        is_waiting_for_resopnse = true;
     }
     network_.SerializeAndSend(response, server_endpoint_);
-    // RepeatedlySend(response, milliseconds(100), milliseconds(5000));
 }
 
 void Client::ProcessData()

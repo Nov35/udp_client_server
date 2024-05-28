@@ -7,7 +7,7 @@
 #include <random>
 
 ClientContextImpl::ClientContextImpl(asio::io_context &io_context)
-    : iteration_(0), state_(ClientState::Accepted)
+    : iteration_(0), state_(ClientState::Accepted), timer_(io_context)
 {
 }
 
@@ -67,6 +67,11 @@ DataChunk ClientContextImpl::GetChunkOfData()
         ++packets_count;
 
     return DataChunk{(data_.data() + begin), (data_.data() + end), packets_count};
+}
+
+asio::steady_timer &ClientContextImpl::GetTimer()
+{
+    return timer_;
 }
 
 std::mutex &ClientContextImpl::GetMutex()

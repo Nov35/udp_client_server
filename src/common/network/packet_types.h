@@ -27,8 +27,6 @@ enum class PacketType : uint8_t
 
 struct Packet
 {
-    using Ptr = std::shared_ptr<Packet>;
-
     PacketType type_;
     uint32_t chunk_;
 };

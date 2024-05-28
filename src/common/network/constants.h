@@ -18,4 +18,5 @@ namespace constants
     constexpr size_t values_to_transfer = 1'000'000;
 
     constexpr size_t send_attempts = 5;
+    constexpr size_t resend_delay_ms = 50;
 }

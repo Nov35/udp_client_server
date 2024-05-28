@@ -24,9 +24,6 @@ private:
     void MakeInitialRequest();
     void SendRangeSetting();
     void FlushBuffer();
-    // void RepeatedlySend(const CommandPacket::Ptr packet,
-    //                     asio::chrono::milliseconds delay,
-    //                     asio::chrono::milliseconds max_delay);
 
 private:
     void HandleSeverResponse(const ServerResponse::Ptr response,
@@ -47,7 +44,6 @@ private:
 
     const double range_constant_;
     asio::steady_timer timer_;
-    bool is_waiting_for_resopnse;
 
     size_t current_chunk_;
     std::vector<PayloadMessage::Ptr> buffer_;

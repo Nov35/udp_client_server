@@ -4,6 +4,7 @@
 #include "client_context_impl.cpp"
 
 #include <asio/io_context.hpp>
+#include <asio/steady_timer.hpp>
 
 TEST(UnitTests, InitialRequestDeserealization)
 {

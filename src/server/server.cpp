@@ -8,13 +8,10 @@
 #include <cstring>
 #include <thread>
 
-// TODO Check server methods for possible deadlock
-
 Server::Server(asio::io_context &io_context, const uint16_t port)
     : network_(io_context, port, GetCallbackList()),
       io_context_(io_context),
-      //   pool_(std::thread::hardware_concurrency()),
-      clients_(io_context), timer_(io_context)
+      clients_(io_context)
 {
     network_.Receive();
 }
@@ -80,8 +77,9 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr response, const
     if (context.Empty())
         throw std::logic_error("User storage was removed during data transfer");
 
-    spdlog::warn("{}:{}: Preparing {} missing packets",
-                 client.address().to_string(), client.port(), response->packets_missing_);
+    spdlog::warn("{}:{}: Preparing {} missing packets from chunk: {}",
+                 client.address().to_string(), client.port(), response->packets_missing_,
+                 response->chunk_);
 
     auto chunk = context.GetChunkOfData();
 
@@ -112,6 +110,21 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr response, const
     SendPacketCheckRequest(std::move(context), client);
 }
 
+void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
+{
+    asio::post(io_context_.get_executor(), std::bind(&ClientStore::Remove, &clients_, client));
+
+    spdlog::error("{}:{}: Client rejected: {}",
+                  client.address().to_string(), client.port(), error);
+
+    ServerResponse::Ptr response = std::make_shared<ServerResponse>();
+    response->is_successful_ = false;
+    response->msg_lenght_ = error.length();
+    std::strcpy(response->message_, error.data());
+
+    network_.SerializeAndSend(response, client);
+}
+
 void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint client)
 {
     auto chunk = context.GetChunkOfData();
@@ -128,7 +141,7 @@ void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint c
 
     context.Unlock();
 
-    network_.SerializeAndSend(check_request, client);
+    SendRepeatedly(check_request, client);
 
     if (check_request->packets_sent_ == 0)
     {
@@ -137,34 +150,6 @@ void Server::SendPacketCheckRequest(LockedContext context, const udp::endpoint c
         clients_.Remove(client);
     }
 }
-
-// void Server::RepeatedlySend(const CommandPacket::Ptr packet, const udp::endpoint client,
-//                             asio::chrono::milliseconds delay)
-// {
-//     LockedContext context = clients_.Get(client);
-
-//     spdlog::info("enter chunk{}, delay = {}" ,packet->chunk_, delay.count());
-
-//     if (context.Empty())
-//         return;
-
-//     if (packet->chunk_ < context.CurrentChunk() ||
-//         context.GetState() != ClientState::WaitingForResponse)
-//         return;
-
-//     if (delay > asio::chrono::milliseconds(50000))
-//     {
-//         context.Unlock();
-//         SendErrorAndRemoveClient(client, fmt::format("Timeout exceeded. No response from the client for chunk: {}.", packet->chunk_));
-//         return;
-//     }
-
-//     network_.SerializeAndSend(packet, client);
-
-//     timer_.expires_from_now(asio::chrono::milliseconds(2000));
-//     timer_.async_wait(std::bind(&Server::RepeatedlySend,
-//                                 this, packet, client, delay * 10));
-// }
 
 void Server::HandleInitialRequest(const InitialRequest::Ptr request, const udp::endpoint client)
 {
@@ -264,19 +249,4 @@ void Server::HandlePacketCheckResponse(const PacketCheckResponse::Ptr response, 
 
     context.Unlock();
     ResendMissingPackets(response, client);
-}
-
-void Server::SendErrorAndRemoveClient(const udp::endpoint client, const std::string_view error)
-{
-    asio::post(io_context_.get_executor(), std::bind(&ClientStore::Remove, &clients_, client));
-
-    spdlog::error("{}:{}: Client rejected: {}",
-                  client.address().to_string(), client.port(), error);
-
-    ServerResponse::Ptr response = std::make_shared<ServerResponse>();
-    response->is_successful_ = false;
-    response->msg_lenght_ = error.length();
-    std::strcpy(response->message_, error.data());
-
-    network_.SerializeAndSend(response, client);
 }

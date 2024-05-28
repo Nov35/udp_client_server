@@ -11,7 +11,6 @@
 
 class DataChunk;
 
-//TODO Re-implement repeated sending with iteration check
 class ClientContextImpl
 {
 public:
@@ -31,11 +30,15 @@ public:
 
     size_t CurrentChunk();
 
+    asio::steady_timer& GetTimer();
     std::mutex& GetMutex();
 
 private:
     size_t iteration_;
     ClientState state_;
+
+    asio::steady_timer timer_;
+
     std::vector<double> data_;
     std::mutex mutex_;
 };

@@ -25,19 +25,9 @@ public:
 
 public:
     template <class PacketPtr>
-    void SerializeAndSend(const PacketPtr packet, const udp::endpoint receiver_endpoint)
-    {
-        size_t data_size = Serialize<decltype(*packet)>(*packet, send_buffer_);
-        SendFromBuffer(data_size, receiver_endpoint);
-    }
-
+    void SerializeAndSend(const PacketPtr packet, const udp::endpoint receiver_endpoint);
     template <class PacketType>
-    auto GetReceivedPacket()
-    {
-        auto packet = std::make_shared<PacketType>();
-        Deserialize<PacketType>({receive_buffer_, bytes_received_}, *packet);
-        return packet;
-    }
+    auto GetReceivedPacket();
 
 private:
     void SendFromBuffer(size_t data_size, const udp::endpoint receiver_endpoint);
@@ -48,9 +38,29 @@ private:
 
 private:
     udp::socket socket_;
+
     BinaryData send_buffer_;
+    std::mutex send_mutex_;
+
     BinaryData receive_buffer_;
     size_t bytes_received_;
+
     const ReceiveHandlingFuncs packet_handle_callbacks_;
     udp::endpoint last_sender_;
 };
+
+template <class PacketPtr>
+inline void Network::SerializeAndSend(const PacketPtr packet, const udp::endpoint receiver_endpoint)
+{
+    std::lock_guard<std::mutex> lock(send_mutex_);
+    size_t data_size = Serialize(*packet, send_buffer_);
+    SendFromBuffer(data_size, receiver_endpoint);
+}
+
+template <class PacketType>
+inline auto Network::GetReceivedPacket()
+{
+    auto packet = std::make_shared<PacketType>();
+    Deserialize({receive_buffer_, bytes_received_}, *packet);
+    return packet;
+}

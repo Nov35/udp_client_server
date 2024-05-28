@@ -4,48 +4,53 @@
 #include "data_chunk.h"
 
 LockedContext::LockedContext()
-    : context_ptr_(nullptr)
+    : impl_ptr_(nullptr)
 {
 }
 
 LockedContext::LockedContext(ClientContextImpl *ptr)
-    : context_ptr_(ptr), lock_(ptr->GetMutex())
+    : impl_ptr_(ptr), lock_(ptr->GetMutex())
 {
 }
 
 ClientState LockedContext::GetState()
 {
-    return context_ptr_->GetState();
+    return impl_ptr_->GetState();
 }
 
 void LockedContext::SetState(const ClientState state)
 {
-    context_ptr_->SetState(state);
+    impl_ptr_->SetState(state);
 }
 
 void LockedContext::PrepareData(const double range)
 {
-    context_ptr_->PrepareData(range);
+    impl_ptr_->PrepareData(range);
 }
 
 DataChunk LockedContext::GetChunkOfData()
 {
-    return context_ptr_->GetChunkOfData();
+    return impl_ptr_->GetChunkOfData();
 }
 
 void LockedContext::NextIteration()
 {
-    context_ptr_->NextIteration();
+    impl_ptr_->NextIteration();
 }
 
 size_t LockedContext::CurrentChunk()
 {
-    return context_ptr_->CurrentChunk();
+    return impl_ptr_->CurrentChunk();
+}
+
+asio::steady_timer &LockedContext::GetTimer()
+{
+    return impl_ptr_->GetTimer();
 }
 
 bool LockedContext::Empty()
 {
-    return context_ptr_ == nullptr;
+    return impl_ptr_ == nullptr;
 }
 
 void LockedContext::Unlock()

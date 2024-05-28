@@ -7,14 +7,14 @@
 
 using asio::ip::udp;
 
-Network::Network(asio::io_context& io_context, ReceiveHandlingFuncs&& packet_handle_callbacks, const std::string server_ip, const uint16_t port)
+Network::Network(asio::io_context &io_context, ReceiveHandlingFuncs &&packet_handle_callbacks, const std::string server_ip, const uint16_t port)
     : socket_(io_context), receive_buffer_(constants::max_packet_size),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
 
     udp::resolver resolver(io_context);
 
-    auto&& server_endpoint_ =
+    auto &&server_endpoint_ =
         *resolver.resolve(udp::v4(), server_ip, std::to_string(port)).begin();
 
     asio::connect(socket_, resolver.resolve(udp::v4(), server_ip, std::to_string(port)));
@@ -30,7 +30,7 @@ Network::Network(asio::io_context &io_context, const uint16_t port,
 
 void Network::Receive()
 {
-    socket_.async_receive_from(asio::buffer(receive_buffer_), last_sender_,
+    socket_.async_receive_from(asio::buffer(receive_buffer_.data(), constants::max_packet_size), last_sender_,
                                std::bind(&Network::HandleReceive,
                                          this,
                                          asio::placeholders::error,
@@ -65,8 +65,8 @@ void Network::HandleReceive(const std::error_code &error,
     if (error)
     {
         spdlog::error("{}:{}: Error during receiving: {}",
-            last_sender_.address().to_string(), last_sender_.port(),
-            error.message());
+                      last_sender_.address().to_string(), last_sender_.port(),
+                      error.message());
 
         return Receive();
     }
@@ -83,7 +83,7 @@ void Network::HandleReceive(const std::error_code &error,
         return Receive();
     }
 
-    const auto& callback = packet_handle_callbacks_.at(type);
+    const auto &callback = packet_handle_callbacks_.at(type);
 
     callback(last_sender_);
 
