@@ -7,9 +7,11 @@
 
 using asio::ip::udp;
 
-Network::Network(asio::io_context &io_context, ReceiveHandlingFuncs &&packet_handle_callbacks, const std::string server_ip, const uint16_t port)
+Network::Network(asio::io_context &io_context, 
+    ReceiveHandlingFuncs &&packet_handle_callbacks,
+    const std::string server_ip, const uint16_t port)
     : socket_(io_context), receive_buffer_(constants::max_packet_size),
-      packet_handle_callbacks_(packet_handle_callbacks)
+      bytes_received_(0), packet_handle_callbacks_(packet_handle_callbacks)
 {
 
     udp::resolver resolver(io_context);
@@ -23,7 +25,7 @@ Network::Network(asio::io_context &io_context, ReceiveHandlingFuncs &&packet_han
 Network::Network(asio::io_context &io_context, const uint16_t port,
                  ReceiveHandlingFuncs &&packet_handle_callbacks)
     : socket_(io_context, udp::endpoint(udp::v4(), port)),
-      receive_buffer_(constants::max_packet_size),
+      receive_buffer_(constants::max_packet_size), bytes_received_(0),
       packet_handle_callbacks_(packet_handle_callbacks)
 {
 }
