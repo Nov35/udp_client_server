@@ -5,7 +5,7 @@
 
 #include <asio/io_context.hpp>
 #include <spdlog/spdlog.h>
-#include  <asio/steady_timer.hpp>
+#include <asio/steady_timer.hpp>
 
 #include <functional>
 #include <fstream>
@@ -17,7 +17,7 @@ Client::Client(asio::io_context &io_context, const std::string server_ip,
     : io_context_(io_context),
       network_(io_context, GetCallbackList(), server_ip, port),
       range_constant_(range_constant), timer_(io_context),
-       current_chunk_(1)
+      current_chunk_(1)
 {
     udp::resolver resolver(io_context);
 
@@ -156,7 +156,7 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
     {
         Lock lock(data_mutex_);
-        
+
         if (request->packets_sent_ == 0)
             return ProcessData();
 
@@ -192,9 +192,9 @@ void Client::HandlePacketCheckRequest(const PacketCheckRequest::Ptr request, con
 
         if (response->packets_missing_ == 0)
             FlushBuffer();
-
-        spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
-                     request->chunk_);
+        else
+            spdlog::warn("Requesting {} missing packets from server for chunk {}.", response->packets_missing_,
+                         request->chunk_);
     }
     network_.SerializeAndSend(response, server_endpoint_);
 }
