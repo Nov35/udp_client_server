@@ -8,7 +8,7 @@
 #include <string>
 
 using BinaryData = std::vector<uint8_t>;
-using Payload = double[constants::max_payload_elements];
+using Payload = double[constants::max_packet_payload_elements];
 
 //TODO Try approach without dynamic allocation/polymorphysm
 

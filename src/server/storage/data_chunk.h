@@ -1,24 +1,19 @@
 #pragma once
 
 #include <cstddef>
+#include <span>
 
-//TODO add iterator compatible interface
 class DataChunk
 {
 public:
-    struct Payload
-    {
-        const double *begin_;
-        const double *end_;
-    };
+    using Payload = std::span<const double>;
 
 public:
-    DataChunk(const double *begin, const double *end, const size_t count);
+    DataChunk(Payload data);
     const size_t GetPacketsCount();
     Payload GetPayload(const size_t packet_id);
 
 private:
-    const double *begin_;
-    const double *end_;
+    Payload data_;
     size_t packets_count_;
 };

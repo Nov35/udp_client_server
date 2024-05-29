@@ -72,8 +72,8 @@ TEST(UnitTests, GeneratedDataIsAccessedCorrectly)
     {
         for (int i = 1; i <= chunk.GetPacketsCount(); ++i)
         {
-            auto [begin, end] = chunk.GetPayload(i);
-            dest_ptr = std::copy(begin, end, dest_ptr);
+            auto payload = chunk.GetPayload(i);
+            dest_ptr = std::copy(payload.begin(), payload.end(), dest_ptr);
         }
         context.NextIteration();
         chunk = context.GetChunkOfData();

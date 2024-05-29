@@ -54,12 +54,12 @@ void Server::SendChunkOfData(LockedContext context, const udp::endpoint client)
 
     for (size_t i = 1; i <= chunk.GetPacketsCount(); ++i)
     {
-        auto [begin, end] = chunk.GetPayload(i);
+        auto payload = chunk.GetPayload(i);
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = i;
-        packet->payload_size_ = end - begin;
-        std::copy(begin, end, packet->payload_);
+        packet->payload_size_ = payload.size();
+        std::copy(payload.begin(), payload.end(), packet->payload_);
 
         spdlog::trace("{}:{}: Sending packet id: {} Size: {}",
                       client.address().to_string(), client.port(), i, packet->payload_size_);
@@ -86,9 +86,9 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr response, const
     for (size_t i = 0; i < response->packets_missing_; ++i)
     {
         size_t requested_packet = response->missing_packets_[i];
-        auto [begin, end] = chunk.GetPayload(requested_packet);
+        auto payload = chunk.GetPayload(requested_packet);
 
-        if (begin == nullptr)
+        if (payload.empty())
         {
             context.Unlock();
             SendErrorAndRemoveClient(client, fmt::format("Attempt to get non-existing packet: {}.",
@@ -98,8 +98,8 @@ void Server::ResendMissingPackets(const PacketCheckResponse::Ptr response, const
 
         PayloadMessage::Ptr packet = std::make_shared<PayloadMessage>();
         packet->packet_id_ = requested_packet;
-        packet->payload_size_ = end - begin;
-        std::copy(begin, end, packet->payload_);
+        packet->payload_size_ = payload.size();
+        std::copy(payload.begin(), payload.end(), packet->payload_);
 
         spdlog::trace("{}:{}: Sending packet id: {} Size: {}",
                       client.address().to_string(), client.port(), requested_packet, packet->payload_size_);

@@ -52,21 +52,15 @@ size_t ClientContextImpl::CurrentChunk()
 
 DataChunk ClientContextImpl::GetChunkOfData()
 {
-    using namespace constants;
-
-    size_t begin = iteration_ * elements_in_one_chunk;
+    size_t begin = iteration_ * constants::elements_in_one_chunk;
 
     if (begin >= data_.size())
-        return DataChunk{nullptr, nullptr, 0};
+        return DataChunk({});
 
-    size_t end = std::min(begin + elements_in_one_chunk, data_.size());
+    size_t end = std::min(begin + constants::elements_in_one_chunk, data_.size());
+    size_t elements_count = end - begin;
 
-    size_t packets_count = (end - begin) / constants::max_payload_elements;
-
-    if ((end - begin) % constants::max_payload_elements != 0)
-        ++packets_count;
-
-    return DataChunk{(data_.data() + begin), (data_.data() + end), packets_count};
+    return DataChunk({(data_.data() + begin), elements_count});
 }
 
 asio::steady_timer &ClientContextImpl::GetTimer()
